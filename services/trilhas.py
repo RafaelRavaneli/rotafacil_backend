@@ -4,6 +4,25 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 
 class Trilhas:
     @staticmethod
+    def _usuario_pode_gerenciar_trilha(dados_trilha, usuario_atual):
+        """
+        Regra compartilhada entre atualizar e deletar trilha:
+        só o criador, o guia responsável, ou um admin podem mexer.
+        """
+        criador = dados_trilha.get('criado_por')
+        guia = dados_trilha.get('id_guia')
+
+        papel = (usuario_atual.get('tipo') or '').strip().lower()
+        email_usuario = usuario_atual.get('email')
+        id_usuario = usuario_atual.get('id')
+
+        eh_admin = papel == 'admin'
+        eh_criador = email_usuario == criador or id_usuario == criador
+        eh_guia_responsavel = email_usuario == guia or id_usuario == guia
+
+        return eh_admin or eh_criador or eh_guia_responsavel
+    
+    @staticmethod
     def cadastrar_trilha(db, dados, usuario_atual):
         try:
             if not dados:
@@ -79,15 +98,19 @@ class Trilhas:
             return {"erro": f"Ocorreu um erro na busca por data: {str(e)}"}, 500
         
     @staticmethod
-    def atualizar_trilha(db, id_trilha, dados):
+    def atualizar_trilha(db, id_trilha, dados, usuario_atual):
         try:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
-            
+
             doc_ref = db.collection('trilhas').document(id_trilha)
-            if not doc_ref.get().exists:
+            doc = doc_ref.get()
+            if not doc.exists:
                 return {"erro": "Trilha não encontrada"}, 404
-                
+
+            if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
+                return {"erro": "Acesso negado. Você não tem permissão para gerenciar esta trilha."}, 403
+
             doc_ref.update(dados)
             return {"mensagem": "Trilha atualizada com sucesso!"}, 200
         except Exception as e:
@@ -98,23 +121,18 @@ class Trilhas:
         try:
             doc_ref = db.collection('trilhas').document(id_trilha)
             doc = doc_ref.get()
-            
+
             if not doc.exists:
                 return {"erro": "Trilha não encontrada"}, 404
-                
-            # Sua regra de segurança de exclusão
-            dados_trilha = doc.to_dict()
-            criador = dados_trilha.get('criado_por')
-            guia = dados_trilha.get('id_guia')
-            
-            if usuario_atual != criador and usuario_atual != guia:
+
+            if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
                 return {"erro": "Acesso negado. Você não tem permissão para gerenciar esta trilha."}, 403
-                
+
             doc_ref.delete()
             return {"mensagem": "Trilha deletada com sucesso!"}, 200
         except Exception as e:
             return {"erro": f"Erro ao deletar trilha: {str(e)}"}, 500
-
+        
 #busca avançada com filtros dinâmicos  
     @staticmethod
     def buscar_trilhas_avancado(db, filtros):
