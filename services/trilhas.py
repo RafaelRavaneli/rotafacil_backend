@@ -8,13 +8,6 @@ class Trilhas:
         try:
             if not dados:
                 return {"erro": "Dados não enviados"}, 400
-            
-            tipo_usuario = usuario_atual.get("tipo") if isinstance(usuario_atual, dict) else usuario_atual
-            tipo_normalizado = (tipo_usuario or "").strip().lower()
-            permissoes = {"agencia", "agência", "guia"}
-
-            if tipo_normalizado not in permissoes:
-                return {"erro": "Acesso negado. Apenas agências e guias podem cadastrar trilhas."}, 403
 
             # Validações estruturais do José
             campos_obrigatorios = ["nome", "descricao", "dificuldade"]

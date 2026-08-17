@@ -1,104 +1,32 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime
-from google.cloud.firestore_v1.base_query import FieldFilter
 from models.database import bd
+from services.trilhas import Trilhas
+from services.autenticacao import token_obrigatorio, requer_papel
 
 # Inicializa o Blueprint
 trilhas_bp = Blueprint('trilhas', __name__)
 
+# Apenas Guias e Agências podem criar trilhas
 @trilhas_bp.route('/', methods=['POST'])
-def criar_trilha():
-    try:
-        dados = request.get_json()
-        nome = dados.get('nome')
-        descricao = dados.get('descricao')
-        cidade = dados.get('cidade')
-        estado = dados.get('estado')
-        dificuldade = dados.get('dificuldade')
-        ponto_encontro = dados.get('ponto_encontro')
-        data_str = dados.get('data')
+@token_obrigatorio
+@requer_papel('guia', 'agencia')
+def criar_trilha(usuario_atual):
+    # Passamos o usuario_atual para o serviço saber quem está criando
+    resposta, status = Trilhas.cadastrar_trilha(bd, request.get_json(), usuario_atual)
+    return jsonify(resposta), status
 
-        # Converte a string de data para datetime
-        data = None
-        if data_str:
-            try:
-                data = datetime.strptime(data_str, "%Y-%m-%dT%H:%M:%S")
-            except ValueError:
-                return jsonify({"erro": "Formato de data inválido. Use AAAA-MM-DDTHH:MM:SS"}), 400
-
-        nova_trilha = {
-            "nome": nome,
-            "descricao": descricao,
-            "cidade": cidade,
-            "estado": estado,
-            "dificuldade": dificuldade,
-            "ponto_encontro": ponto_encontro,
-            "data": data
-        }
-
-        # Adiciona ao Firestore
-        doc_ref = bd.collection("trilhas").add(nova_trilha)
-        return jsonify({"mensagem": "Trilha criada com sucesso!", "id": doc_ref[1].id}), 201
-    except Exception as e:
-         return jsonify({"erro": str(e)}), 500
-
+# Público (Qualquer um com token pode ver)
 @trilhas_bp.route('/', methods=['GET'])
-def listar_trilhas():
-     try:
-          trilhas_ref = bd.collection("trilhas").stream()
-          lista_trilhas = []
-          for doc in trilhas_ref:
-               trilha = doc.to_dict()
-               trilha["id"] = doc.id
-               lista_trilhas.append(trilha)
-          return jsonify(lista_trilhas), 200
-     except Exception as e:
-          return jsonify({"erro": str(e)}), 500
+@token_obrigatorio
+def listar_trilhas(usuario_atual):
+    resposta, status = Trilhas.listar_trilhas(bd)
+    return jsonify(resposta), status
 
+# Busca avançada (Qualquer um com token pode buscar)
 @trilhas_bp.route('/busca', methods=['GET'])
-def buscar_trilhas_avancada():
-    try:
-        query = bd.collection('trilhas')
-
-        # Filtrar por Cidade
-        cidade = request.args.get('cidade')
-        if cidade:
-             query = query.where(filter=FieldFilter('cidade', '==', cidade))
-
-        # Filtrar por Dificuldade
-        dificuldade = request.args.get('dificuldade')
-        if dificuldade:
-             query = query.where(filter=FieldFilter('dificuldade', '==', dificuldade))
-
-        # Filtrar por Data (Intervalo)
-        data_inicio = request.args.get('data_inicio')
-        data_fim = request.args.get('data_fim')
-
-        if data_inicio:
-            try:
-                dt_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
-                query = query.where(filter=FieldFilter('data', '>=', dt_inicio))
-            except ValueError:
-                return jsonify({"erro": "Formato de data_inicio inválido. Use AAAA-MM-DD"}), 400
-
-        if data_fim:
-            try:
-                # Modificado para incluir até o final do dia
-                dt_fim = datetime.strptime(data_fim, "%Y-%m-%d")
-                dt_fim = dt_fim.replace(hour=23, minute=59, second=59)
-                query = query.where(filter=FieldFilter('data', '<=', dt_fim))
-            except ValueError:
-                 return jsonify({"erro": "Formato de data_fim inválido. Use AAAA-MM-DD"}), 400
-
-        # Executa a query
-        resultados = query.stream()
-        lista_trilhas = []
-        for doc in resultados:
-            trilha = doc.to_dict()
-            trilha['id'] = doc.id
-            lista_trilhas.append(trilha)
-
-        return jsonify(lista_trilhas), 200
-
-    except Exception as e:
-         return jsonify({"erro": str(e)}), 500
+@token_obrigatorio
+def buscar_trilhas_avancada(usuario_atual):
+    # Pega os parâmetros da URL (Query Params) e transforma num dicionário
+    filtros = request.args.to_dict()
+    resposta, status = Trilhas.buscar_trilhas_avancado(bd, filtros)
+    return jsonify(resposta), status
