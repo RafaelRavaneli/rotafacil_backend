@@ -12,7 +12,12 @@ class Agendamentos:
             for campo in campos_obrigatorios:
                 if campo not in dados:
                     return {"erro": f"Campo obrigatório: {campo}"}, 400
-                
+
+            # Confirma que a trilha referenciada existe de verdade antes de agendar
+            trilha_ref = db.collection('trilhas').document(dados['id_trilha']).get()
+            if not trilha_ref.exists:
+                return {"erro": "Trilha não encontrada. Verifique o id_trilha informado."}, 404
+
             id_agendamento = str(uuid.uuid4())
             agendamento = {
                 "id": id_agendamento,
@@ -50,12 +55,28 @@ class Agendamentos:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
         
     @staticmethod
-    def cancelar_agendamento(db, id_agendamento):
+    def cancelar_agendamento(db, id_agendamento, usuario_atual):
         try:
             doc_ref = db.collection('agendamentos').document(id_agendamento)
-            if not doc_ref.get().exists:
+            doc = doc_ref.get()
+
+            if not doc.exists:
                 return {"erro": "Agendamento não encontrado"}, 404
-                
+
+            dados_agendamento = doc.to_dict()
+            id_usuario_dono = dados_agendamento.get('id_usuario')
+            id_guia_responsavel = dados_agendamento.get('id_guia')
+
+            papel = (usuario_atual.get('tipo') or '').strip().lower()
+            usuario_id = usuario_atual.get('id')
+
+            eh_admin = papel == 'admin'
+            eh_dono_do_agendamento = usuario_id == id_usuario_dono
+            eh_guia_responsavel = usuario_id == id_guia_responsavel
+
+            if not (eh_admin or eh_dono_do_agendamento or eh_guia_responsavel):
+                return {"erro": "Acesso negado. Você não tem permissão para cancelar este agendamento."}, 403
+
             doc_ref.update({"status": "cancelado"})
             return {"mensagem": "agendamento cancelado com sucesso !"}, 200
         except Exception as e:
