@@ -1,0 +1,74 @@
+from flask import Blueprint, request, jsonify
+from models.database import bd
+from services.usuarios import Usuarios
+from services.autenticacao import token_obrigatorio, requer_papel, eh_dono_ou_tem_papel
+
+usuarios_bp = Blueprint('usuarios', __name__)
+
+# --- Cadastro: público, sem RBAC (ninguém tem token ainda) ---
+@usuarios_bp.route('/', methods=['POST'])
+def cadastrar_usuario():
+    resposta, status = Usuarios.cadastrar_usuario(bd, request.get_json())
+    return jsonify(resposta), status
+
+# --- Listar TODOS os usuários: só admin ---
+@usuarios_bp.route('/', methods=['GET'])
+@token_obrigatorio
+@requer_papel('admin')
+def listar_usuarios(usuario_atual):
+    resposta, status = Usuarios.listar_usuarios(bd)
+    return jsonify(resposta), status
+
+# --- Buscar por e-mail: dono ou admin ---
+@usuarios_bp.route('/email/<email>', methods=['GET'])
+@token_obrigatorio
+def listar_usuario_por_email(usuario_atual, email):
+    if not eh_dono_ou_tem_papel(usuario_atual, email, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode ver o próprio perfil."}), 403
+    resposta, status = Usuarios.listar_usuario_por_email(bd, email)
+    return jsonify(resposta), status
+
+# --- Buscar por ID: dono ou admin ---
+@usuarios_bp.route('/<id>', methods=['GET'])
+@token_obrigatorio
+def listar_usuario_por_id(usuario_atual, id):
+    if not eh_dono_ou_tem_papel(usuario_atual, id, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode ver o próprio perfil."}), 403
+    resposta, status = Usuarios.listar_usuario_por_id(bd, id)
+    return jsonify(resposta), status
+
+# --- Atualizar por e-mail: dono ou admin ---
+@usuarios_bp.route('/email/<email>', methods=['PUT'])
+@token_obrigatorio
+def atualizar_usuario_por_email(usuario_atual, email):
+    if not eh_dono_ou_tem_papel(usuario_atual, email, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode editar o próprio perfil."}), 403
+    resposta, status = Usuarios.atualizar_usuario_por_email(bd, email, request.get_json())
+    return jsonify(resposta), status
+
+# --- Atualizar por ID: dono ou admin ---
+@usuarios_bp.route('/<id>', methods=['PUT'])
+@token_obrigatorio
+def atualizar_usuario_por_id(usuario_atual, id):
+    if not eh_dono_ou_tem_papel(usuario_atual, id, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode editar o próprio perfil."}), 403
+    resposta, status = Usuarios.atualizar_usuario_por_id(bd, id, request.get_json())
+    return jsonify(resposta), status
+
+# --- Deletar por e-mail: dono ou admin ---
+@usuarios_bp.route('/email/<email>', methods=['DELETE'])
+@token_obrigatorio
+def deletar_usuario_por_email(usuario_atual, email):
+    if not eh_dono_ou_tem_papel(usuario_atual, email, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode deletar o próprio perfil."}), 403
+    resposta, status = Usuarios.deletar_usuario_por_email(bd, email)
+    return jsonify(resposta), status
+
+# --- Deletar por ID: dono ou admin ---
+@usuarios_bp.route('/<id>', methods=['DELETE'])
+@token_obrigatorio
+def deletar_usuario_por_id(usuario_atual, id):
+    if not eh_dono_ou_tem_papel(usuario_atual, id, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode deletar o próprio perfil."}), 403
+    resposta, status = Usuarios.deletar_usuario_por_id(bd, id)
+    return jsonify(resposta), status

@@ -1,21 +1,24 @@
-import email
 import uuid
 from werkzeug.security import generate_password_hash
 from firebase_admin import firestore
 
 class Usuarios:
+    TIPOS_PERMITIDOS_NO_CADASTRO = {"usuario", "guia", "agencia"}  # admin NUNCA pode vir daqui
     @staticmethod
     def cadastrar_usuario(db, dados):
         try:
-            # Verifica se os dados existem
             if not dados:
                 return {"erro": "Dados não enviados"}, 400
-            
+
             campos_obrigatorios = ["nome", "email", "senha"]
             for campo in campos_obrigatorios:
                 if campo not in dados:
                     return {"erro": f"Campo Obrigatório: {campo}"}, 400
-                    
+
+            tipo_solicitado = (dados.get("tipo") or "usuario").strip().lower()
+            if tipo_solicitado not in Usuarios.TIPOS_PERMITIDOS_NO_CADASTRO:
+                return {"erro": f"Tipo de usuário inválido. Use um de: {', '.join(Usuarios.TIPOS_PERMITIDOS_NO_CADASTRO)}"}, 400
+
             usuario_existente = db.collection('usuarios') \
                 .where('email', '==', dados['email']) \
                 .stream()
@@ -33,7 +36,7 @@ class Usuarios:
                 "cidade": dados.get("cidade"),
                 "estado": dados.get("estado"),
                 "senha": generate_password_hash(dados["senha"]),
-                "tipo": dados.get("tipo", "usuario"),
+                "tipo": tipo_solicitado,   # ← ESSA É A ÚNICA LINHA QUE MUDA
                 "ativo": True,
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
@@ -42,7 +45,7 @@ class Usuarios:
             return {"mensagem": "Usuário cadastrado com sucesso!", "id": id_usuario}, 201
         except Exception as e:
             return {"erro": f"Ocorreu um erro ao salvar: {str(e)}"}, 500
-        
+
     @staticmethod
     def listar_usuarios(db):
         try:
@@ -50,7 +53,7 @@ class Usuarios:
             usuarios = []
             for doc in usuarios_ref:
                 usuario = doc.to_dict()
-                usuario.pop("senha", None) # Remove a senha por segurança
+                usuario.pop("senha", None)  # Remove a senha por segurança
                 usuarios.append(usuario)
             return usuarios, 200
         except Exception as e:
