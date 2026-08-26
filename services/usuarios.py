@@ -1,9 +1,54 @@
+import re
 import uuid
 from werkzeug.security import generate_password_hash
 from firebase_admin import firestore
 
 class Usuarios:
     TIPOS_PERMITIDOS_NO_CADASTRO = {"usuario", "guia", "agencia"}  # admin NUNCA pode vir daqui
+    
+    @staticmethod
+    def _validar_cpf(cpf):
+        cpf = re.sub(r'\D', '', cpf or '')
+        if len(cpf) != 11 or cpf == cpf[0] * 11:
+            return False
+
+        def calcular_digito(base, pesos):
+            soma = sum(int(d) * p for d, p in zip(base, pesos))
+            resto = soma % 11
+            return '0' if resto < 2 else str(11 - resto)
+
+        dv1 = calcular_digito(cpf[:9], range(10, 1, -1))
+        dv2 = calcular_digito(cpf[:9] + dv1, range(11, 1, -1))
+        return cpf[-2:] == dv1 + dv2
+
+    @staticmethod
+    def _validar_cnpj(cnpj):
+        cnpj = re.sub(r'\D', '', cnpj or '')
+        if len(cnpj) != 14 or cnpj == cnpj[0] * 14:
+            return False
+
+        def calcular_digito(base, pesos):
+            soma = sum(int(d) * p for d, p in zip(base, pesos))
+            resto = soma % 11
+            return '0' if resto < 2 else str(11 - resto)
+
+        pesos1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        pesos2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        dv1 = calcular_digito(cnpj[:12], pesos1)
+        dv2 = calcular_digito(cnpj[:12] + dv1, pesos2)
+        return cnpj[-2:] == dv1 + dv2
+
+    @staticmethod
+    def _validar_documento(documento):
+        """Aceita CPF (11 dígitos) ou CNPJ (14 dígitos), detectando qual é pelo tamanho.
+        Retorna (valido: bool, tipo: 'cpf' | 'cnpj' | None)."""
+        apenas_digitos = re.sub(r'\D', '', documento or '')
+        if len(apenas_digitos) == 11:
+            return Usuarios._validar_cpf(apenas_digitos), 'cpf'
+        elif len(apenas_digitos) == 14:
+            return Usuarios._validar_cnpj(apenas_digitos), 'cnpj'
+        return False, None
+    
     @staticmethod
     def cadastrar_usuario(db, dados):
         try:
@@ -19,6 +64,18 @@ class Usuarios:
             if tipo_solicitado not in Usuarios.TIPOS_PERMITIDOS_NO_CADASTRO:
                 return {"erro": f"Tipo de usuário inválido. Use um de: {', '.join(Usuarios.TIPOS_PERMITIDOS_NO_CADASTRO)}"}, 400
 
+            documento = dados.get("documento")
+            documento_limpo = re.sub(r'\D', '', documento) if documento else None
+            tipo_documento = None
+
+            if tipo_solicitado in {"guia", "agencia"} and not documento_limpo:
+                return {"erro": "Documento (CPF ou CNPJ) é obrigatório para guias e agências"}, 400
+
+            if documento_limpo:
+                valido, tipo_documento = Usuarios._validar_documento(documento_limpo)
+                if not valido:
+                    return {"erro": "CPF/CNPJ inválido"}, 400
+                
             usuario_existente = db.collection('usuarios') \
                 .where('email', '==', dados['email']) \
                 .stream()
@@ -36,7 +93,9 @@ class Usuarios:
                 "cidade": dados.get("cidade"),
                 "estado": dados.get("estado"),
                 "senha": generate_password_hash(dados["senha"]),
-                "tipo": tipo_solicitado,   # ← ESSA É A ÚNICA LINHA QUE MUDA
+                "tipo": tipo_solicitado,
+                "documento": documento_limpo,
+                "tipo_documento": tipo_documento,
                 "ativo": True,
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
@@ -93,6 +152,7 @@ class Usuarios:
             docs = list(usuarios_ref)
             if not docs:
                 return {"erro": "Usuário não encontrado"}, 404
+            
             doc_id = docs[0].id
             db.collection('usuarios').document(doc_id).delete()
             return {"mensagem": "Usuário deletado com sucesso!"}, 200
@@ -115,6 +175,14 @@ class Usuarios:
         try:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
+
+            if "documento" in dados:
+                valido, tipo_documento = Usuarios._validar_documento(dados["documento"])
+                if not valido:
+                    return {"erro": "CPF/CNPJ inválido"}, 400
+                dados["documento"] = re.sub(r'\D', '', dados["documento"])
+                dados["tipo_documento"] = tipo_documento
+
             usuarios_ref = db.collection('usuarios').where('email', '==', email).stream()
             docs = list(usuarios_ref)
             if not docs:
@@ -130,10 +198,19 @@ class Usuarios:
         try:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
+            
+            # Validação garantida também pelo ID
+            if "documento" in dados:
+                valido, tipo_documento = Usuarios._validar_documento(dados["documento"])
+                if not valido:
+                    return {"erro": "CPF/CNPJ inválido"}, 400
+                dados["documento"] = re.sub(r'\D', '', dados["documento"])
+                dados["tipo_documento"] = tipo_documento
+
             usuarios_ref = db.collection('usuarios').document(id).get()
             if not usuarios_ref.exists:
                 return {"erro": "Usuário não encontrado"}, 404
             db.collection('usuarios').document(id).update(dados)
             return {"mensagem": "Usuário atualizado com sucesso!"}, 200
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao atualizar usuário: {str(e)}"}, 500 
+            return {"erro": f"Ocorreu um erro ao atualizar usuário: {str(e)}"}, 500
