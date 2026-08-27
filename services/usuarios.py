@@ -76,6 +76,11 @@ class Usuarios:
                 if not valido:
                     return {"erro": "CPF/CNPJ inválido"}, 400
                 
+                # --- NOVA TRAVA: Verifica se o documento já existe no banco ---
+                documento_existente = db.collection('usuarios').where('documento', '==', documento_limpo).stream()
+                if list(documento_existente):
+                    return {"erro": "CPF/CNPJ já cadastrado no sistema"}, 409
+                
             usuario_existente = db.collection('usuarios') \
                 .where('email', '==', dados['email']) \
                 .stream()
@@ -84,7 +89,6 @@ class Usuarios:
                 return {"erro": "Email já cadastrado"}, 409
                     
             id_usuario = str(uuid.uuid4())
-            # Dicionário fechado para evitar inserção de lixo no banco
             usuario = {
                 "id": id_usuario,
                 "nome": dados.get("nome"),
@@ -112,7 +116,7 @@ class Usuarios:
             usuarios = []
             for doc in usuarios_ref:
                 usuario = doc.to_dict()
-                usuario.pop("senha", None)  # Remove a senha por segurança
+                usuario.pop("senha", None)  
                 usuarios.append(usuario)
             return usuarios, 200
         except Exception as e:
@@ -125,7 +129,7 @@ class Usuarios:
             usuarios = []
             for doc in usuarios_ref:
                 usuario = doc.to_dict()
-                usuario.pop("senha", None) # Remove a senha por segurança
+                usuario.pop("senha", None) 
                 usuarios.append(usuario)
             if usuarios:
                 return usuarios, 200
@@ -139,7 +143,7 @@ class Usuarios:
             usuario_ref = db.collection('usuarios').document(id).get()
             if usuario_ref.exists:
                 usuario = usuario_ref.to_dict()
-                usuario.pop("senha", None) # Remove a senha por segurança
+                usuario.pop("senha", None) 
                 return usuario, 200
             return {"erro": "Usuário não encontrado"}, 404
         except Exception as e:
@@ -180,7 +184,16 @@ class Usuarios:
                 valido, tipo_documento = Usuarios._validar_documento(dados["documento"])
                 if not valido:
                     return {"erro": "CPF/CNPJ inválido"}, 400
-                dados["documento"] = re.sub(r'\D', '', dados["documento"])
+                
+                documento_limpo = re.sub(r'\D', '', dados["documento"])
+                
+                # --- NOVA TRAVA: Evita que um usuário pegue o documento de outro ---
+                doc_existente = db.collection('usuarios').where('documento', '==', documento_limpo).stream()
+                for doc in doc_existente:
+                    if doc.to_dict().get('email') != email:
+                        return {"erro": "CPF/CNPJ já cadastrado por outro usuário"}, 409
+
+                dados["documento"] = documento_limpo
                 dados["tipo_documento"] = tipo_documento
 
             usuarios_ref = db.collection('usuarios').where('email', '==', email).stream()
@@ -199,12 +212,20 @@ class Usuarios:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
             
-            # Validação garantida também pelo ID
             if "documento" in dados:
                 valido, tipo_documento = Usuarios._validar_documento(dados["documento"])
                 if not valido:
                     return {"erro": "CPF/CNPJ inválido"}, 400
-                dados["documento"] = re.sub(r'\D', '', dados["documento"])
+                
+                documento_limpo = re.sub(r'\D', '', dados["documento"])
+
+                # --- NOVA TRAVA: Evita que um usuário pegue o documento de outro ---
+                doc_existente = db.collection('usuarios').where('documento', '==', documento_limpo).stream()
+                for doc in doc_existente:
+                    if doc.id != id:
+                        return {"erro": "CPF/CNPJ já cadastrado por outro usuário"}, 409
+                
+                dados["documento"] = documento_limpo
                 dados["tipo_documento"] = tipo_documento
 
             usuarios_ref = db.collection('usuarios').document(id).get()
