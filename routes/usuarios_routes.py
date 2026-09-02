@@ -82,3 +82,13 @@ def verificar_usuario(usuario_atual, id):
     verificado = dados.get('verificado', True)
     resposta, status = Usuarios.verificar_usuario(bd, id, verificado)
     return jsonify(resposta), status
+
+# --- Mudar tipo de usuário (com validação de documento se virar guia/agencia): dono ou admin ---
+@usuarios_bp.route('/<id>/tipo', methods=['PUT'])
+@token_obrigatorio
+def mudar_tipo_usuario(usuario_atual, id):
+    if not eh_dono_ou_tem_papel(usuario_atual, id, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode alterar o próprio tipo."}), 403
+    dados = request.get_json(silent=True) or {}
+    resposta, status = Usuarios.mudar_tipo_usuario(bd, id, dados.get('tipo'), dados.get('documento'))
+    return jsonify(resposta), status

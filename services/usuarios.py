@@ -181,6 +181,9 @@ class Usuarios:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
 
+            if "tipo" in dados:
+                return {"erro": "Este campo só pode ser alterado via PUT /api/usuarios/<id>/tipo"}, 403
+
             if "verificado" in dados:
                 return {"erro": "Este campo só pode ser alterado por um admin"}, 403
 
@@ -215,6 +218,9 @@ class Usuarios:
         try:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
+
+            if "tipo" in dados:
+                return {"erro": "Este campo só pode ser alterado via PUT /api/usuarios/<id>/tipo"}, 403
 
             if "verificado" in dados:
                 return {"erro": "Este campo só pode ser alterado por um admin"}, 403
@@ -260,3 +266,47 @@ class Usuarios:
             return {"mensagem": f"Usuário {acao} com sucesso!"}, 200
         except Exception as e:
             return {"erro": f"Erro ao verificar usuário: {str(e)}"}, 500
+
+    @staticmethod
+    def mudar_tipo_usuario(db, id_usuario, novo_tipo, documento_novo=None):
+        try:
+            novo_tipo = (novo_tipo or "").strip().lower()
+            if novo_tipo not in Usuarios.TIPOS_PERMITIDOS_NO_CADASTRO:
+                return {"erro": f"Tipo inválido. Use um de: {', '.join(Usuarios.TIPOS_PERMITIDOS_NO_CADASTRO)}"}, 400
+
+            doc_ref = db.collection('usuarios').document(id_usuario)
+            doc = doc_ref.get()
+            if not doc.exists:
+                return {"erro": "Usuário não encontrado"}, 404
+
+            dados_atuais = doc.to_dict()
+            documento_atual = dados_atuais.get('documento')
+            tipo_documento_atual = dados_atuais.get('tipo_documento')
+
+            atualizacao = {"tipo": novo_tipo, "verificado": False}
+
+            if novo_tipo in {"guia", "agencia"}:
+                # Precisa de documento válido: usa o que já está salvo, ou o novo enviado agora
+                documento_para_validar = documento_novo or documento_atual
+                if not documento_para_validar:
+                    return {"erro": "Documento (CPF ou CNPJ) é obrigatório para guias e agências"}, 400
+
+                valido, tipo_documento = Usuarios._validar_documento(documento_para_validar)
+                if not valido:
+                    return {"erro": "CPF/CNPJ inválido"}, 400
+
+                documento_limpo = re.sub(r'\D', '', documento_para_validar)
+
+                # Mesma trava de duplicidade do cadastro
+                doc_existente = db.collection('usuarios').where('documento', '==', documento_limpo).stream()
+                for outro in doc_existente:
+                    if outro.id != id_usuario:
+                        return {"erro": "CPF/CNPJ já cadastrado por outro usuário"}, 409
+
+                atualizacao["documento"] = documento_limpo
+                atualizacao["tipo_documento"] = tipo_documento
+
+            doc_ref.update(atualizacao)
+            return {"mensagem": f"Tipo de usuário alterado para '{novo_tipo}' com sucesso!"}, 200
+        except Exception as e:
+            return {"erro": f"Erro ao alterar tipo de usuário: {str(e)}"}, 500
