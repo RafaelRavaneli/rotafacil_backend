@@ -82,7 +82,6 @@ class Trilhas:
             criado_por = usuario_atual.get("email") if isinstance(usuario_atual, dict) else usuario_atual 
             guia_responsavel = dados.get("id_guia", criado_por)     
             trilha = {
-                "imagem_url": dados.get("imagem_url"),
                 "id": id_trilha,
                 "nome": dados.get("nome"),
                 "descricao": dados.get("descricao"),
@@ -182,7 +181,7 @@ class Trilhas:
 
             # Filtros de igualdade: sempre podem ser combinados, geo ou não
             if filtros.get('dificuldade'):
-                query = query.where(filter=FieldFilter('dificuldade', '==', filtros.ge('dificuldade')))
+                query = query.where(filter=FieldFilter('dificuldade', '==', filtros.get('dificuldade')))
                 
             if filtros.get('estado'):
                 query = query.where(filter=FieldFilter('estado', '==', filtros.get('estado')))
