@@ -49,3 +49,13 @@ def listar_agendamentos_guia(usuario_atual, id_guia):
 def cancelar_agendamento(usuario_atual, id_agendamento):
     resposta, status = Agendamentos.cancelar_agendamento(bd, id_agendamento, usuario_atual)
     return jsonify(resposta), status
+
+# --- Dashboard do guia/agência: dono ou admin ---
+@agendamentos_bp.route('/dashboard/<id_guia>', methods=['GET'])
+@token_obrigatorio
+@requer_papel('guia', 'agencia', 'admin')
+def dashboard_guia(usuario_atual, id_guia):
+    if not eh_dono_ou_tem_papel(usuario_atual, id_guia, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode ver seu próprio dashboard."}), 403
+    resposta, status = Agendamentos.dashboard_guia(bd, id_guia)
+    return jsonify(resposta), status
