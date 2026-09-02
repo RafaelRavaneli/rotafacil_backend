@@ -95,6 +95,7 @@ class Trilhas:
                 "longitude": longitude,
                 "geohash": geohash,
                 "imagem_url": dados.get("imagem_url"),
+                "acessivel": bool(dados.get("acessivel", False)),
                 "criado_por": criado_por,
                 "id_guia": guia_responsavel,
                 "ativo": True,
@@ -188,6 +189,11 @@ class Trilhas:
 
             if filtros.get('cidade'):
                 query = query.where(filter=FieldFilter('cidade', '==', filtros.get('cidade')))
+            query = query.where(filter=FieldFilter('ativo', '==', True))
+
+            if filtros.get('acessivel') is not None:
+                valor_acessivel = str(filtros.get('acessivel')).strip().lower() == 'true'
+                query = query.where(filter=FieldFilter('acessivel', '==', valor_acessivel))
             query = query.where(filter=FieldFilter('ativo', '==', True))
 
             if busca_geografica:
