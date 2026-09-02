@@ -7,6 +7,8 @@ from routes.usuarios_routes import usuarios_bp
 from routes.auth_routes import auth_bp
 from routes.agendamentos_routes import agendamentos_bp
 from routes.uploads_routes import uploads_bp
+from routes.redefinicao_senha_routes import redefinicao_senha_bp
+
 
 app = Flask(__name__)
 # CORS(app)  # Descomente se estiver usando CORS
@@ -19,6 +21,8 @@ app.register_blueprint(usuarios_bp, url_prefix='/api/usuarios')
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(agendamentos_bp, url_prefix='/api/agendamentos')
 app.register_blueprint(uploads_bp, url_prefix='/api/uploads')
+app.register_blueprint(redefinicao_senha_bp, url_prefix='/api/auth/senha')
+
 
 # Rota de teste simples na raiz da API só para garantir que o servidor subiu
 @app.route('/', methods=['GET'])
