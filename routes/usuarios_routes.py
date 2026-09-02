@@ -72,3 +72,13 @@ def deletar_usuario_por_id(usuario_atual, id):
         return jsonify({"erro": "Acesso negado. Você só pode deletar o próprio perfil."}), 403
     resposta, status = Usuarios.deletar_usuario_por_id(bd, id)
     return jsonify(resposta), status
+
+# --- Verificar/desverificar guia ou agência: exclusivo admin ---
+@usuarios_bp.route('/<id>/verificar', methods=['PUT'])
+@token_obrigatorio
+@requer_papel('admin')
+def verificar_usuario(usuario_atual, id):
+    dados = request.get_json(silent=True) or {}
+    verificado = dados.get('verificado', True)
+    resposta, status = Usuarios.verificar_usuario(bd, id, verificado)
+    return jsonify(resposta), status

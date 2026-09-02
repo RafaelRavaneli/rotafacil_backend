@@ -100,6 +100,7 @@ class Usuarios:
                 "tipo": tipo_solicitado,
                 "documento": documento_limpo,
                 "tipo_documento": tipo_documento,
+                "verificado": False,
                 "ativo": True,
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
@@ -180,6 +181,9 @@ class Usuarios:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
 
+            if "verificado" in dados:
+                return {"erro": "Este campo só pode ser alterado por um admin"}, 403
+
             if "documento" in dados:
                 valido, tipo_documento = Usuarios._validar_documento(dados["documento"])
                 if not valido:
@@ -211,7 +215,10 @@ class Usuarios:
         try:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
-            
+
+            if "verificado" in dados:
+                return {"erro": "Este campo só pode ser alterado por um admin"}, 403
+
             if "documento" in dados:
                 valido, tipo_documento = Usuarios._validar_documento(dados["documento"])
                 if not valido:
@@ -235,3 +242,21 @@ class Usuarios:
             return {"mensagem": "Usuário atualizado com sucesso!"}, 200
         except Exception as e:
             return {"erro": f"Ocorreu um erro ao atualizar usuário: {str(e)}"}, 500
+
+    @staticmethod
+    def verificar_usuario(db, id_usuario, verificado):
+        try:
+            doc_ref = db.collection('usuarios').document(id_usuario)
+            doc = doc_ref.get()
+            if not doc.exists:
+                return {"erro": "Usuário não encontrado"}, 404
+
+            tipo = (doc.to_dict().get('tipo') or '').strip().lower()
+            if tipo not in {"guia", "agencia"}:
+                return {"erro": "Só é possível verificar usuários do tipo guia ou agencia"}, 400
+
+            doc_ref.update({"verificado": bool(verificado)})
+            acao = "verificado" if verificado else "teve a verificação removida"
+            return {"mensagem": f"Usuário {acao} com sucesso!"}, 200
+        except Exception as e:
+            return {"erro": f"Erro ao verificar usuário: {str(e)}"}, 500
