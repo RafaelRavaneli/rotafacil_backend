@@ -62,3 +62,12 @@ def atualizar_trilha(usuario_atual, id_trilha):
 def deletar_trilha(usuario_atual, id_trilha):
     resposta, status = Trilhas.deletar_trilha(bd, id_trilha, usuario_atual)
     return jsonify(resposta), status
+
+from services.clima import Clima
+
+# --- Previsão do tempo para os dias da trilha ---
+@trilhas_bp.route('/<id_trilha>/clima', methods=['GET'])
+@token_obrigatorio
+def previsao_tempo_trilha(usuario_atual, id_trilha):
+    resposta, status = Clima.obter_previsao_trilha(bd, id_trilha)
+    return jsonify(resposta), status
