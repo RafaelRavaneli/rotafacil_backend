@@ -9,7 +9,7 @@ from routes.agendamentos_routes import agendamentos_bp
 from routes.uploads_routes import uploads_bp
 from routes.redefinicao_senha_routes import redefinicao_senha_bp
 from routes.favoritos_routes import favoritos_bp
-
+from routes.avaliacoes_routes import avaliacoes_bp 
 
 app = Flask(__name__)
 # CORS(app)  # Descomente se estiver usando CORS
@@ -24,6 +24,7 @@ app.register_blueprint(agendamentos_bp, url_prefix='/api/agendamentos')
 app.register_blueprint(uploads_bp, url_prefix='/api/uploads')
 app.register_blueprint(redefinicao_senha_bp, url_prefix='/api/auth/senha')
 app.register_blueprint(favoritos_bp, url_prefix='/api/favoritos')
+app.register_blueprint(avaliacoes_bp, url_prefix='/api/avaliacoes')
 
 
 # Rota de teste simples na raiz da API só para garantir que o servidor subiu
