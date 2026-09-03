@@ -53,7 +53,27 @@ class Trilhas:
             else:
                 break
         return precisao_escolhida
-    
+
+    @staticmethod
+    def _validar_lista_coordenadas(lista):
+        """Valida uma lista de pontos [{'latitude':.., 'longitude':..}, ...], usada tanto
+        pro trajeto da trilha quanto (futuramente) por outras features baseadas em rota."""
+        if not isinstance(lista, list):
+            return False, "deve ser uma lista de pontos"
+        pontos_validados = []
+        for ponto in lista:
+            if not isinstance(ponto, dict) or "latitude" not in ponto or "longitude" not in ponto:
+                return False, "cada ponto precisa ter 'latitude' e 'longitude'"
+            try:
+                lat = float(ponto["latitude"])
+                lon = float(ponto["longitude"])
+            except (TypeError, ValueError):
+                return False, "latitude e longitude devem ser números válidos"
+            if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+                return False, "coordenada fora do intervalo válido"
+            pontos_validados.append({"latitude": lat, "longitude": lon})
+        return True, pontos_validados
+
     @staticmethod
     def cadastrar_trilha(db, dados, usuario_atual):
         try:
@@ -78,6 +98,16 @@ class Trilhas:
                     return {"erro": "Coordenadas fora do intervalo válido"}, 400
                 geohash = pgh.encode(latitude, longitude, precision=9)
 
+            itens_recomendados = dados.get("itens_recomendados", [])
+            if not isinstance(itens_recomendados, list) or not all(isinstance(i, str) for i in itens_recomendados):
+                return {"erro": "itens_recomendados deve ser uma lista de textos"}, 400
+
+            trajeto = dados.get("trajeto", [])
+            valido, resultado = Trilhas._validar_lista_coordenadas(trajeto)
+            if not valido:
+                return {"erro": f"Campo 'trajeto' inválido: {resultado}"}, 400
+            trajeto = resultado
+
             id_trilha = str(uuid.uuid4())
             criado_por = usuario_atual.get("email") if isinstance(usuario_atual, dict) else usuario_atual 
             guia_responsavel = dados.get("id_guia", criado_por)     
@@ -96,6 +126,8 @@ class Trilhas:
                 "geohash": geohash,
                 "imagem_url": dados.get("imagem_url"),
                 "acessivel": bool(dados.get("acessivel", False)),
+                "itens_recomendados": itens_recomendados,
+                "trajeto": trajeto,
                 "criado_por": criado_por,
                 "id_guia": guia_responsavel,
                 "ativo": True,
@@ -155,6 +187,16 @@ class Trilhas:
                 except (TypeError, ValueError):
                     return {"erro": "latitude e longitude devem ser números válidos"}, 400
                 dados["geohash"] = pgh.encode(dados["latitude"], dados["longitude"], precision=9)
+
+            if "trajeto" in dados:
+                valido, resultado = Trilhas._validar_lista_coordenadas(dados["trajeto"])
+                if not valido:
+                    return {"erro": f"Campo 'trajeto' inválido: {resultado}"}, 400
+                dados["trajeto"] = resultado
+
+            if "itens_recomendados" in dados:
+                if not isinstance(dados["itens_recomendados"], list) or not all(isinstance(i, str) for i in dados["itens_recomendados"]):
+                    return {"erro": "itens_recomendados deve ser uma lista de textos"}, 400
 
             doc_ref = db.collection('trilhas').document(id_trilha)
             doc = doc_ref.get()
