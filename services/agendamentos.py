@@ -3,6 +3,15 @@ from firebase_admin import firestore
 
 class Agendamentos:
     @staticmethod
+    def _usuario_pode_gerenciar_agendamento(dados_agendamento, usuario_atual):
+        papel = (usuario_atual.get('tipo') or '').strip().lower()
+        usuario_id = usuario_atual.get('id')
+        eh_admin = papel == 'admin'
+        eh_dono = usuario_id == dados_agendamento.get('id_usuario')
+        eh_guia_responsavel = usuario_id == dados_agendamento.get('id_guia')
+        return eh_admin or eh_dono or eh_guia_responsavel
+
+    @staticmethod
     def agendar_trilha(db, dados):
         try:
             if not dados:
@@ -35,7 +44,7 @@ class Agendamentos:
             return {"mensagem": "Agendamento realizado com sucesso!", "id": id_agendamento}, 201
         except Exception as e:
             return {"erro": f"Erro interno: {str(e)}"}, 500
-       
+
     @staticmethod
     def listar_agendamentos_usuario(db, id_usuario):
         try:
@@ -44,7 +53,7 @@ class Agendamentos:
             return lista, 200
         except Exception as e:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
-        
+
     @staticmethod
     def listar_agendamentos_guia(db, id_guia):
         try:
@@ -53,7 +62,7 @@ class Agendamentos:
             return lista, 200
         except Exception as e:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
-        
+
     @staticmethod
     def cancelar_agendamento(db, id_agendamento, usuario_atual):
         try:
@@ -63,18 +72,7 @@ class Agendamentos:
             if not doc.exists:
                 return {"erro": "Agendamento não encontrado"}, 404
 
-            dados_agendamento = doc.to_dict()
-            id_usuario_dono = dados_agendamento.get('id_usuario')
-            id_guia_responsavel = dados_agendamento.get('id_guia')
-
-            papel = (usuario_atual.get('tipo') or '').strip().lower()
-            usuario_id = usuario_atual.get('id')
-
-            eh_admin = papel == 'admin'
-            eh_dono_do_agendamento = usuario_id == id_usuario_dono
-            eh_guia_responsavel = usuario_id == id_guia_responsavel
-
-            if not (eh_admin or eh_dono_do_agendamento or eh_guia_responsavel):
+            if not Agendamentos._usuario_pode_gerenciar_agendamento(doc.to_dict(), usuario_atual):
                 return {"erro": "Acesso negado. Você não tem permissão para cancelar este agendamento."}, 403
 
             doc_ref.update({"status": "cancelado"})
@@ -83,49 +81,52 @@ class Agendamentos:
             return {"erro": f"Erro ao cancelar agendamento: {str(e)}"}, 500
 
     @staticmethod
-    def dashboard_guia(db, id_guia):
+    def fazer_checkin(db, id_agendamento, usuario_atual, latitude=None, longitude=None):
         try:
-            guia_doc = db.collection('usuarios').document(id_guia).get()
-            identificadores = [id_guia]
-            if guia_doc.exists:
-                email_guia = guia_doc.to_dict().get('email')
-                if email_guia:
-                    identificadores.append(email_guia)
+            doc_ref = db.collection('agendamentos').document(id_agendamento)
+            doc = doc_ref.get()
+            if not doc.exists:
+                return {"erro": "Agendamento não encontrado"}, 404
 
-            agendamentos_ref = db.collection('agendamentos').where('id_guia', 'in', identificadores).stream()
-            agendamentos = [doc.to_dict() for doc in agendamentos_ref]
+            dados = doc.to_dict()
+            if not Agendamentos._usuario_pode_gerenciar_agendamento(dados, usuario_atual):
+                return {"erro": "Acesso negado."}, 403
 
-            cancelados = [a for a in agendamentos if a.get('status') == 'cancelado']
-            confirmados = [a for a in agendamentos if a.get('status') != 'cancelado']
-            receita_total = sum(float(a.get('valor_pago') or 0) for a in confirmados)
+            if dados.get('status') != 'agendado':
+                return {"erro": f"Não é possível fazer check-in: status atual é '{dados.get('status')}'."}, 400
 
-            contagem_por_trilha = {}
-            for a in confirmados:
-                id_trilha = a.get('id_trilha')
-                if id_trilha:
-                    contagem_por_trilha[id_trilha] = contagem_por_trilha.get(id_trilha, 0) + 1
+            atualizacao = {
+                "status": "em_andamento",
+                "checkin_at": firestore.SERVER_TIMESTAMP,
+            }
+            if latitude is not None and longitude is not None:
+                atualizacao["checkin_latitude"] = latitude
+                atualizacao["checkin_longitude"] = longitude
 
-            trilha_mais_agendada = None
-            if contagem_por_trilha:
-                id_trilha_top = max(contagem_por_trilha, key=contagem_por_trilha.get)
-                trilha_doc = db.collection('trilhas').document(id_trilha_top).get()
-                if trilha_doc.exists:
-                    trilha_mais_agendada = {
-                        "id": id_trilha_top,
-                        "nome": trilha_doc.to_dict().get('nome'),
-                        "total_agendamentos": contagem_por_trilha[id_trilha_top]
-                    }
-
-            trilhas_ref = db.collection('trilhas').where('id_guia', 'in', identificadores).stream()
-            total_trilhas_criadas = sum(1 for _ in trilhas_ref)
-
-            return {
-                "total_trilhas_criadas": total_trilhas_criadas,
-                "total_agendamentos": len(agendamentos),
-                "agendamentos_confirmados": len(confirmados),
-                "agendamentos_cancelados": len(cancelados),
-                "receita_total": round(receita_total, 2),
-                "trilha_mais_agendada": trilha_mais_agendada
-            }, 200
+            doc_ref.update(atualizacao)
+            return {"mensagem": "Check-in realizado! Boa trilha e cuidado no percurso."}, 200
         except Exception as e:
-            return {"erro": f"Erro ao gerar dashboard: {str(e)}"}, 500
+            return {"erro": f"Erro ao fazer check-in: {str(e)}"}, 500
+
+    @staticmethod
+    def fazer_checkout(db, id_agendamento, usuario_atual):
+        try:
+            doc_ref = db.collection('agendamentos').document(id_agendamento)
+            doc = doc_ref.get()
+            if not doc.exists:
+                return {"erro": "Agendamento não encontrado"}, 404
+
+            dados = doc.to_dict()
+            if not Agendamentos._usuario_pode_gerenciar_agendamento(dados, usuario_atual):
+                return {"erro": "Acesso negado."}, 403
+
+            if dados.get('status') != 'em_andamento':
+                return {"erro": f"Não é possível fazer check-out: status atual é '{dados.get('status')}'. Faça check-in primeiro."}, 400
+
+            doc_ref.update({
+                "status": "concluido",
+                "checkout_at": firestore.SERVER_TIMESTAMP,
+            })
+            return {"mensagem": "Check-out realizado! Trilha concluída com sucesso."}, 200
+        except Exception as e:
+            return {"erro": f"Erro ao fazer check-out: {str(e)}"}, 500

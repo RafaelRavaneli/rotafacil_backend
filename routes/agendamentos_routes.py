@@ -59,3 +59,20 @@ def dashboard_guia(usuario_atual, id_guia):
         return jsonify({"erro": "Acesso negado. Você só pode ver seu próprio dashboard."}), 403
     resposta, status = Agendamentos.dashboard_guia(bd, id_guia)
     return jsonify(resposta), status
+
+# --- Check-in: confirma início da trilha ---
+@agendamentos_bp.route('/<id_agendamento>/checkin', methods=['PUT'])
+@token_obrigatorio
+def checkin_agendamento(usuario_atual, id_agendamento):
+    dados = request.get_json(silent=True) or {}
+    resposta, status = Agendamentos.fazer_checkin(
+        bd, id_agendamento, usuario_atual, dados.get('latitude'), dados.get('longitude')
+    )
+    return jsonify(resposta), status
+
+# --- Check-out: confirma conclusão da trilha ---
+@agendamentos_bp.route('/<id_agendamento>/checkout', methods=['PUT'])
+@token_obrigatorio
+def checkout_agendamento(usuario_atual, id_agendamento):
+    resposta, status = Agendamentos.fazer_checkout(bd, id_agendamento, usuario_atual)
+    return jsonify(resposta), status
