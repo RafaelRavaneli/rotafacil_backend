@@ -92,3 +92,11 @@ def mudar_tipo_usuario(usuario_atual, id):
     dados = request.get_json(silent=True) or {}
     resposta, status = Usuarios.mudar_tipo_usuario(bd, id, dados.get('tipo'), dados.get('documento'))
     return jsonify(resposta), status
+
+# --- Contato de emergência: guia com agendamento ativo, ou admin ---
+@usuarios_bp.route('/<id>/contato-emergencia', methods=['GET'])
+@token_obrigatorio
+@requer_papel('guia', 'agencia', 'admin')
+def obter_contato_emergencia(usuario_atual, id):
+    resposta, status = Usuarios.obter_contato_emergencia(bd, id, usuario_atual)
+    return jsonify(resposta), status

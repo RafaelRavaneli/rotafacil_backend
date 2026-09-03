@@ -100,6 +100,8 @@ class Usuarios:
                 "tipo": tipo_solicitado,
                 "documento": documento_limpo,
                 "tipo_documento": tipo_documento,
+                "contato_emergencia_nome": dados.get("contato_emergencia_nome"),
+                "contato_emergencia_telefone": dados.get("contato_emergencia_telefone"),
                 "verificado": False,
                 "ativo": True,
                 "createdAt": firestore.SERVER_TIMESTAMP
@@ -310,3 +312,34 @@ class Usuarios:
             return {"mensagem": f"Tipo de usuário alterado para '{novo_tipo}' com sucesso!"}, 200
         except Exception as e:
             return {"erro": f"Erro ao alterar tipo de usuário: {str(e)}"}, 500
+
+    @staticmethod
+    def obter_contato_emergencia(db, id_usuario, usuario_solicitante):
+        try:
+            usuario_doc = db.collection('usuarios').document(id_usuario).get()
+            if not usuario_doc.exists:
+                return {"erro": "Usuário não encontrado"}, 404
+            dados_usuario = usuario_doc.to_dict()
+
+            papel_solicitante = (usuario_solicitante.get('tipo') or '').strip().lower()
+            id_solicitante = usuario_solicitante.get('id')
+
+            # Admin passa direto. Guia/agência só se tiver agendamento ativo com esse usuário.
+            if papel_solicitante != 'admin':
+                agendamentos_ref = db.collection('agendamentos') \
+                    .where('id_usuario', '==', id_usuario) \
+                    .where('id_guia', '==', id_solicitante).stream()
+                tem_agendamento_ativo = any(
+                    doc.to_dict().get('status') != 'cancelado' for doc in agendamentos_ref
+                )
+                if not tem_agendamento_ativo:
+                    return {"erro": "Você só pode ver o contato de emergência de participantes com agendamento ativo em suas trilhas."}, 403
+
+            return {
+                "nome_participante": dados_usuario.get("nome"),
+                "telefone_participante": dados_usuario.get("telefone"),
+                "contato_emergencia_nome": dados_usuario.get("contato_emergencia_nome"),
+                "contato_emergencia_telefone": dados_usuario.get("contato_emergencia_telefone"),
+            }, 200
+        except Exception as e:
+            return {"erro": f"Erro ao buscar contato de emergência: {str(e)}"}, 500
