@@ -71,3 +71,34 @@ from services.clima import Clima
 def previsao_tempo_trilha(usuario_atual, id_trilha):
     resposta, status = Clima.obter_previsao_trilha(bd, id_trilha)
     return jsonify(resposta), status
+
+from services.rotas import Rotas
+
+# --- Rota até o destino (do usuário até o início da trilha) ---
+@trilhas_bp.route('/<id_trilha>/rota-ate-destino', methods=['GET'])
+@token_obrigatorio
+def rota_ate_destino(usuario_atual, id_trilha):
+    trilha_doc = bd.collection('trilhas').document(id_trilha).get()
+    if not trilha_doc.exists:
+        return jsonify({"erro": "Trilha não encontrada"}), 404
+
+    dados_trilha = trilha_doc.to_dict()
+    lat_destino = dados_trilha.get('latitude')
+    lon_destino = dados_trilha.get('longitude')
+    if lat_destino is None or lon_destino is None:
+        return jsonify({"erro": "Esta trilha não possui coordenadas cadastradas."}), 400
+
+    lat_origem = request.args.get('latitude')
+    lon_origem = request.args.get('longitude')
+    if not lat_origem or not lon_origem:
+        return jsonify({"erro": "Informe latitude e longitude (sua localização atual) como query params."}), 400
+
+    try:
+        lat_origem = float(lat_origem)
+        lon_origem = float(lon_origem)
+    except ValueError:
+        return jsonify({"erro": "latitude e longitude devem ser números válidos"}), 400
+
+    perfil = request.args.get('perfil', 'driving-car')
+    resposta, status = Rotas.calcular_rota(lat_origem, lon_origem, lat_destino, lon_destino, perfil)
+    return jsonify(resposta), status
