@@ -2,6 +2,7 @@ import re
 import uuid
 from werkzeug.security import generate_password_hash
 from firebase_admin import firestore
+from services.notificacoes import Notificacoes
 
 class Usuarios:
     TIPOS_PERMITIDOS_NO_CADASTRO = {"usuario", "guia", "agencia"}  # admin NUNCA pode vir daqui
@@ -264,6 +265,15 @@ class Usuarios:
                 return {"erro": "Só é possível verificar usuários do tipo guia ou agencia"}, 400
 
             doc_ref.update({"verificado": bool(verificado)})
+
+            if verificado:
+                Notificacoes.notificar_usuario(
+                    db, id_usuario,
+                    "Perfil verificado!",
+                    "Parabéns! Seu perfil foi verificado pela equipe do RotaFácil.",
+                    dados={"tipo": "verificacao"}
+                )
+
             acao = "verificado" if verificado else "teve a verificação removida"
             return {"mensagem": f"Usuário {acao} com sucesso!"}, 200
         except Exception as e:

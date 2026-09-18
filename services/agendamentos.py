@@ -1,5 +1,6 @@
 import uuid
 from firebase_admin import firestore
+from services.notificacoes import Notificacoes
 
 class Agendamentos:
     @staticmethod
@@ -26,7 +27,8 @@ class Agendamentos:
             if not trilha_ref.exists:
                 return {"erro": "Trilha não encontrada. Verifique o id_trilha informado."}, 404
 
-            id_guia = trilha_ref.to_dict().get("id_guia")
+            dados_trilha = trilha_ref.to_dict()
+            id_guia = dados_trilha.get("id_guia")
 
             id_agendamento = str(uuid.uuid4())
             agendamento = {
@@ -41,6 +43,14 @@ class Agendamentos:
             }
 
             db.collection('agendamentos').document(id_agendamento).set(agendamento)
+
+            Notificacoes.notificar_usuario(
+                db, id_guia,
+                "Novo agendamento recebido!",
+                f"Você recebeu um novo agendamento para a trilha '{dados_trilha.get('nome')}'.",
+                dados={"tipo": "novo_agendamento", "id_agendamento": id_agendamento}
+            )
+
             return {"mensagem": "Agendamento realizado com sucesso!", "id": id_agendamento}, 201
         except Exception as e:
             return {"erro": f"Erro interno: {str(e)}"}, 500
@@ -72,10 +82,34 @@ class Agendamentos:
             if not doc.exists:
                 return {"erro": "Agendamento não encontrado"}, 404
 
-            if not Agendamentos._usuario_pode_gerenciar_agendamento(doc.to_dict(), usuario_atual):
+            dados = doc.to_dict()
+            if not Agendamentos._usuario_pode_gerenciar_agendamento(dados, usuario_atual):
                 return {"erro": "Acesso negado. Você não tem permissão para cancelar este agendamento."}, 403
 
             doc_ref.update({"status": "cancelado"})
+
+            quem_cancelou = usuario_atual.get('id')
+            id_usuario_agendamento = dados.get('id_usuario')
+            id_guia_agendamento = dados.get('id_guia')
+
+            trilha_doc = db.collection('trilhas').document(dados.get('id_trilha')).get()
+            nome_trilha = trilha_doc.to_dict().get('nome') if trilha_doc.exists else 'uma trilha'
+
+            if quem_cancelou == id_usuario_agendamento:
+                Notificacoes.notificar_usuario(
+                    db, id_guia_agendamento,
+                    "Agendamento cancelado",
+                    f"Um participante cancelou o agendamento na trilha '{nome_trilha}'.",
+                    dados={"tipo": "cancelamento", "id_agendamento": id_agendamento}
+                )
+            else:
+                Notificacoes.notificar_usuario(
+                    db, id_usuario_agendamento,
+                    "Agendamento cancelado",
+                    f"Seu agendamento na trilha '{nome_trilha}' foi cancelado.",
+                    dados={"tipo": "cancelamento", "id_agendamento": id_agendamento}
+                )
+
             return {"mensagem": "agendamento cancelado com sucesso !"}, 200
         except Exception as e:
             return {"erro": f"Erro ao cancelar agendamento: {str(e)}"}, 500

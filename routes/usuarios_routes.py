@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from models.database import bd
 from services.usuarios import Usuarios
 from services.autenticacao import token_obrigatorio, requer_papel, eh_dono_ou_tem_papel
+from services.notificacoes import Notificacoes
 
 usuarios_bp = Blueprint('usuarios', __name__)
 
@@ -99,4 +100,20 @@ def mudar_tipo_usuario(usuario_atual, id):
 @requer_papel('guia', 'agencia', 'admin')
 def obter_contato_emergencia(usuario_atual, id):
     resposta, status = Usuarios.obter_contato_emergencia(bd, id, usuario_atual)
+    return jsonify(resposta), status
+
+# --- Registrar token de notificação (FCM) do dispositivo atual ---
+@usuarios_bp.route('/fcm-token', methods=['POST'])
+@token_obrigatorio
+def registrar_fcm_token(usuario_atual):
+    dados = request.get_json(silent=True) or {}
+    resposta, status = Notificacoes.registrar_token(bd, usuario_atual.get('id'), dados.get('token'))
+    return jsonify(resposta), status
+
+# --- Remover token de notificação (ex: no logout do app) ---
+@usuarios_bp.route('/fcm-token', methods=['DELETE'])
+@token_obrigatorio
+def remover_fcm_token(usuario_atual):
+    dados = request.get_json(silent=True) or {}
+    resposta, status = Notificacoes.remover_token(bd, usuario_atual.get('id'), dados.get('token'))
     return jsonify(resposta), status
