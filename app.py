@@ -1,5 +1,6 @@
 from flask import Flask
-# from flask_cors import CORS  # Descomente se estiver usando CORS para conectar com o Flutter
+import os
+from flask_cors import CORS
 
 # Importa o blueprint que criamos na pasta routes
 from routes.trilhas_routes import trilhas_bp
@@ -11,12 +12,20 @@ from routes.redefinicao_senha_routes import redefinicao_senha_bp
 from routes.favoritos_routes import favoritos_bp
 from routes.avaliacoes_routes import avaliacoes_bp 
 
+from routes.community_routes import community_bp
+
 app = Flask(__name__)
-# CORS(app)  # Descomente se estiver usando CORS
+# Desenvolvimento local; em produção defina as origens exatas, separadas por vírgula.
+cors_origins = os.getenv('CORS_ORIGINS')
+CORS(app, resources={r"/api/*": {"origins":
+    [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
+    if cors_origins else [r"http://localhost:\d+", r"http://127\.0\.0\.1:\d+"]
+}}, allow_headers=['Authorization', 'Content-Type'])
 
 # Registra o Blueprint de trilhas
 # O url_prefix='/api/trilhas' garante que a rota '/' lá no trilhas_routes.py 
 # vire automaticamente '/api/trilhas/' no navegador/Postman.
+app.register_blueprint(community_bp, url_prefix='/api')
 app.register_blueprint(trilhas_bp, url_prefix='/api/trilhas')
 app.register_blueprint(usuarios_bp, url_prefix='/api/usuarios')
 app.register_blueprint(auth_bp, url_prefix='/api/auth')

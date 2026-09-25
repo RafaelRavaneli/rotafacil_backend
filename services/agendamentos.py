@@ -8,7 +8,7 @@ class Agendamentos:
         usuario_id = usuario_atual.get('id')
         eh_admin = papel == 'admin'
         eh_dono = usuario_id == dados_agendamento.get('id_usuario')
-        eh_guia_responsavel = usuario_id == dados_agendamento.get('id_guia')
+        eh_guia_responsavel = dados_agendamento.get('id_guia') in {usuario_id, usuario_atual.get('email')} - {None, ''}
         return eh_admin or eh_dono or eh_guia_responsavel
 
     @staticmethod
@@ -26,6 +26,8 @@ class Agendamentos:
             if not trilha_ref.exists:
                 return {"erro": "Trilha não encontrada. Verifique o id_trilha informado."}, 404
 
+            if trilha_ref.to_dict().get('ativo') is False:
+                return {"erro": "Esta trilha não está disponível para agendamento."}, 409
             id_guia = trilha_ref.to_dict().get("id_guia")
 
             id_agendamento = str(uuid.uuid4())
@@ -130,3 +132,33 @@ class Agendamentos:
             return {"mensagem": "Check-out realizado! Trilha concluída com sucesso."}, 200
         except Exception as e:
             return {"erro": f"Erro ao fazer check-out: {str(e)}"}, 500
+    @staticmethod
+    def dashboard_guia(db, id_guia):
+        """Valores declarados nas reservas; não representam pagamentos conciliados."""
+        from decimal import Decimal, InvalidOperation
+        aliases = {id_guia}
+        user = db.collection('usuarios').document(id_guia).get()
+        if user.exists and user.to_dict().get('email'):
+            aliases.add(user.to_dict()['email'])
+        elif not user.exists:
+            for doc in db.collection('usuarios').where('email', '==', id_guia).stream():
+                aliases.add(doc.id)
+        rows = {}
+        for alias in aliases:
+            for doc in db.collection('agendamentos').where('id_guia', '==', alias).stream():
+                rows[doc.id] = doc.to_dict()
+        counts = {key: 0 for key in ('agendado', 'em_andamento', 'concluido', 'cancelado', 'outros')}
+        amount = Decimal('0')
+        for item in rows.values():
+            status = item.get('status')
+            counts[status if status in counts else 'outros'] += 1
+            if status not in ('agendado', 'em_andamento', 'concluido'):
+                continue
+            try:
+                value = Decimal(str(item.get('valor_pago', 0)))
+                if value.is_finite() and value >= 0:
+                    amount += value
+            except (InvalidOperation, ValueError):
+                pass
+        return {'total_agendamentos': len(rows), 'por_status': counts,
+                'valor_declarado_ativo': float(amount.quantize(Decimal('0.01')))}, 200
