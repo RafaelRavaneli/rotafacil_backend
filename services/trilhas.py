@@ -1,3 +1,4 @@
+from services.community import Community
 import uuid
 import math
 import pygeohash as pgh
@@ -110,7 +111,9 @@ class Trilhas:
 
             id_trilha = str(uuid.uuid4())
             criado_por = usuario_atual.get("email") if isinstance(usuario_atual, dict) else usuario_atual 
-            guia_responsavel = dados.get("id_guia", criado_por)     
+            guia_responsavel = dados.get("id_guia") or usuario_atual.get("id")
+            if not Community.can_assign(db, usuario_atual, guia_responsavel):
+                return {"erro": "O guia precisa aceitar o convite da agência antes de ser vinculado."}, 403
             trilha = {
                 "id": id_trilha,
                 "nome": dados.get("nome"),
@@ -130,7 +133,8 @@ class Trilhas:
                 "trajeto": trajeto,
                 "criado_por": criado_por,
                 "id_guia": guia_responsavel,
-                "ativo": True,
+                "ativo": bool(dados.get("ativo", True)),
+                "preco": dados.get("preco", 0),
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
 
@@ -206,6 +210,9 @@ class Trilhas:
             if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
                 return {"erro": "Acesso negado. Você não tem permissão para gerenciar esta trilha."}, 403
 
+            if 'id_guia' in dados and dados['id_guia'] != doc.to_dict().get('id_guia'):
+                if not isinstance(dados['id_guia'], str) or not Community.can_assign(db, usuario_atual, dados['id_guia']):
+                    return {"erro": "Guia não vinculado à sua conta."}, 403
             doc_ref.update(dados)
             return {"mensagem": "Trilha atualizada com sucesso!"}, 200
         except Exception as e:
@@ -294,3 +301,14 @@ class Trilhas:
 
         except Exception as e:
             return {"erro": f"Erro na busca avançada: {str(e)}"}, 500
+    @staticmethod
+    def deletar_trilha(db, id_trilha, usuario_atual):
+        doc_ref = db.collection('trilhas').document(id_trilha)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return {"erro": "Trilha não encontrada"}, 404
+        if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
+            return {"erro": "Você não tem permissão para excluir esta trilha."}, 403
+        # Mantém referências de agendamentos já existentes.
+        doc_ref.update({"ativo": False})
+        return {"mensagem": "Trilha desativada com sucesso."}, 200

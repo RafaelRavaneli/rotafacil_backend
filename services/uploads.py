@@ -27,7 +27,7 @@ class Uploads:
             }
 
             # Executa a requisição para a API do ImgBB
-            resposta = requests.post(URL_IMGBB, data=payload, files=arquivos)
+            resposta = requests.post(URL_IMGBB, data=payload, files=arquivos, timeout=20)
             dados = resposta.json()
 
             if resposta.status_code == 200 and dados.get('success'):

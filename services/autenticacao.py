@@ -18,7 +18,7 @@ class Autenticacao:
             'email': email,
             'id': usuario_id,
             'tipo': tipo_perfil,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+            'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=2)
         }
         token = jwt.encode(payload, key, algorithm='HS256')
         return token
@@ -49,7 +49,7 @@ class Autenticacao:
                 nome_do_usuario = usuario_dados.get('nome', 'Usuário')
                 
                 # Pegando o ID e o TIPO do banco para mandar para o gerador de token
-                usuario_id = usuario_dados.get('id')
+                usuario_id = docs[0].id
                 tipo_perfil = usuario_dados.get('tipo', 'usuario')
 
                 # Atualizamos a chamada para passar os 3 argumentos
@@ -59,6 +59,7 @@ class Autenticacao:
                     "mensagem": "Autenticação bem-sucedida",
                     "nome": nome_do_usuario,
                     "tipo": tipo_perfil, # Enviar o tipo solto aqui ajuda o Flutter a montar a tela correta
+                    "id": usuario_id,
                     "token": token
                 }, 200
             else:
@@ -78,7 +79,7 @@ def token_obrigatorio(f):
             if len(parts) == 2 and parts[0].lower() == 'bearer':
                 token = parts[1]
             else:
-                token = parts[-1]
+                return jsonify({'erro': 'Authorization deve usar Bearer token.'}), 401
 
         if not token:
             return jsonify({"erro": "Token não informado. Acesso negado."}), 401
@@ -86,16 +87,18 @@ def token_obrigatorio(f):
         try:
             key = os.getenv("KEY")
             dados_token = jwt.decode(token, key, algorithms=["HS256"])
-            usuario_email = dados_token['email']
-
             db = firestore.client()
-            usuarios_ref = db.collection('usuarios').where('email', '==', usuario_email).stream()
-            docs = list(usuarios_ref)
+            if dados_token.get('id'):
+                doc = db.collection('usuarios').document(dados_token['id']).get()
+                docs = [doc] if doc.exists else []
+            else:
+                docs = list(db.collection('usuarios').where('email', '==', dados_token['email']).stream())
 
             if not docs:
                 return jsonify({"erro": "Usuário não encontrado."}), 401
 
             usuario_atual = docs[0].to_dict()
+            usuario_atual["id"] = docs[0].id
             usuario_atual.pop("senha", None)
         except jwt.ExpiredSignatureError:
             return jsonify({"erro": "O token expirou. Faça login novamente."}), 401
