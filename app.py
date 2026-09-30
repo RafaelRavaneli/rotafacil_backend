@@ -1,5 +1,5 @@
-from flask import Flask
 import os
+from flask import Flask
 from flask_cors import CORS
 
 # Importa o blueprint que criamos na pasta routes
@@ -10,7 +10,8 @@ from routes.agendamentos_routes import agendamentos_bp
 from routes.uploads_routes import uploads_bp
 from routes.redefinicao_senha_routes import redefinicao_senha_bp
 from routes.favoritos_routes import favoritos_bp
-from routes.avaliacoes_routes import avaliacoes_bp 
+from routes.avaliacoes_routes import avaliacoes_bp
+from services.agendador import iniciar_agendador
 
 from routes.community_routes import community_bp
 
@@ -42,4 +43,7 @@ def index():
     return {"mensagem": "API do Rota Fácil rodando com sucesso na arquitetura MVC!"}, 200
 
 if __name__ == '__main__':
+    # Evita que o agendador rode em dobro por causa do reloader do modo debug do Flask
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        iniciar_agendador()
     app.run(debug=True)

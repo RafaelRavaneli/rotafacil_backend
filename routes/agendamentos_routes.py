@@ -76,3 +76,12 @@ def checkin_agendamento(usuario_atual, id_agendamento):
 def checkout_agendamento(usuario_atual, id_agendamento):
     resposta, status = Agendamentos.fazer_checkout(bd, id_agendamento, usuario_atual)
     return jsonify(resposta), status
+
+# --- Rota extra para testar/disparar os lembretes diários na hora (sem esperar o horário agendado) ---
+@agendamentos_bp.route('/testar-lembretes', methods=['POST'])
+@token_obrigatorio
+@requer_papel('admin')
+def testar_lembretes(usuario_atual):
+    from services.agendador import enviar_lembretes_diarios
+    enviar_lembretes_diarios()
+    return jsonify({"mensagem": "Rotina de lembretes executada manualmente."}), 200
