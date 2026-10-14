@@ -44,3 +44,5 @@ requests==2.32.5
 typing_extensions==4.15.0
 urllib3==2.6.3
 Werkzeug==3.1.6
+gunicorn==26.2.0; sys_platform != "win32"
+tzdata==2026.5

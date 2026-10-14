@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, render_template
 from flask_cors import CORS
 
 # Importa o blueprint que criamos na pasta routes
@@ -42,8 +42,14 @@ app.register_blueprint(avaliacoes_bp, url_prefix='/api/avaliacoes')
 def index():
     return {"mensagem": "API do Rota Fácil rodando com sucesso na arquitetura MVC!"}, 200
 
+@app.route('/docs', methods=['GET'])
+def swagger_docs():
+    return render_template('swagger.html')
+
 if __name__ == '__main__':
-    # Evita que o agendador rode em dobro por causa do reloader do modo debug do Flask
-    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+    debug = os.getenv('FLASK_DEBUG', 'false').lower() in {'1', 'true', 'yes'}
+    scheduler_enabled = os.getenv('ENABLE_SCHEDULER', 'false').lower() in {'1', 'true', 'yes'}
+    # No modo debug, inicia o agendador apenas no processo do reloader.
+    if scheduler_enabled and (not debug or os.getenv('WERKZEUG_RUN_MAIN') == 'true'):
         iniciar_agendador()
-    app.run(debug=True)
+    app.run(debug=debug)

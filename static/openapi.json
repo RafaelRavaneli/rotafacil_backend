@@ -1,0 +1,4331 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "API RotaFacil",
+    "version": "1.0.0",
+    "description": "Contrato baseado nas rotas e servicos do backend em 13/10/2026. Exemplos de IDs devem ser substituidos por registros reais. Dados protegidos exigem JWT; permissoes adicionais sao descritas por operacao. A documentacao descreve a API e nao adiciona validacao ao Flask."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Servidor atual da documentacao"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Sistema"
+    },
+    {
+      "name": "Autenticacao"
+    },
+    {
+      "name": "Usuarios"
+    },
+    {
+      "name": "Trilhas"
+    },
+    {
+      "name": "Agendamentos"
+    },
+    {
+      "name": "Favoritos"
+    },
+    {
+      "name": "Avaliacoes"
+    },
+    {
+      "name": "Guias"
+    },
+    {
+      "name": "Convites"
+    },
+    {
+      "name": "Notificacoes"
+    },
+    {
+      "name": "Uploads"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Verificar disponibilidade da API",
+        "operationId": "get_",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticacao"
+        ],
+        "summary": "Entrar e obter JWT",
+        "operationId": "post_api_auth_login",
+        "description": "JWT emitido com validade de duas horas. Perfil e identidade sao definidos pelo servidor.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sessao"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/senha/solicitar": {
+      "post": {
+        "tags": [
+          "Autenticacao"
+        ],
+        "summary": "Solicitar recuperacao de senha",
+        "operationId": "post_api_auth_senha_solicitar",
+        "description": "Resposta generica mesmo quando o e-mail nao existe. Token de recuperacao expira em 30 minutos.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Email"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/senha/redefinir": {
+      "post": {
+        "tags": [
+          "Autenticacao"
+        ],
+        "summary": "Definir nova senha",
+        "operationId": "post_api_auth_senha_redefinir",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NovaSenha"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/": {
+      "post": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Cadastrar usuario",
+        "operationId": "post_api_usuarios",
+        "description": "Cadastro publico aceita usuario, guia e agencia. Admin nao pode ser cadastrado por esta rota. Guia e agencia exigem CPF/CNPJ valido.",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Registro criado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Criacao"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com registro ou estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Cadastro"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Listar usuarios",
+        "operationId": "get_api_usuarios",
+        "description": "Exclusivo de administrador. Retorno nao inclui senha.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Usuario"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/{id}": {
+      "get": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Consultar usuario por ID",
+        "operationId": "get_api_usuarios_id",
+        "description": "Proprio usuario ou administrador. Consulta por e-mail retorna lista; por ID retorna objeto.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Atualizar usuario por ID",
+        "operationId": "put_api_usuarios_id",
+        "description": "Proprio usuario ou administrador. Envie ao menos um campo. Tipo e verificacao usam endpoints especificos. Este contrato lista campos de perfil; o servico atual ainda nao possui lista explicita de campos permitidos.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com registro ou estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerfilEditavel"
+              },
+              "example": {
+                "nome": "Ana Silva",
+                "cidade": "Maringa"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Excluir usuario por ID",
+        "operationId": "delete_api_usuarios_id",
+        "description": "Proprio usuario ou administrador. Exclusao do documento; nao representa politica completa de exclusao de dados relacionados.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/email/{email}": {
+      "get": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Consultar usuario por e-mail",
+        "operationId": "get_api_usuarios_email_email",
+        "description": "Proprio usuario ou administrador. Consulta por e-mail retorna lista; por ID retorna objeto.",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "example": "ana@example.com"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Usuario"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Atualizar usuario por e-mail",
+        "operationId": "put_api_usuarios_email_email",
+        "description": "Proprio usuario ou administrador. Envie ao menos um campo. Tipo e verificacao usam endpoints especificos. Este contrato lista campos de perfil; o servico atual ainda nao possui lista explicita de campos permitidos.",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "example": "ana@example.com"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com registro ou estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerfilEditavel"
+              },
+              "example": {
+                "nome": "Ana Silva",
+                "cidade": "Maringa"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Excluir usuario por e-mail",
+        "operationId": "delete_api_usuarios_email_email",
+        "description": "Proprio usuario ou administrador. Exclusao do documento; nao representa politica completa de exclusao de dados relacionados.",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "example": "ana@example.com"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/{id}/verificar": {
+      "put": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Verificar guia ou agencia",
+        "operationId": "put_api_usuarios_id_verificar",
+        "description": "Exclusivo de administrador. Valor padrao de verificado e true.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Verificacao"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/{id}/tipo": {
+      "put": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Alterar tipo de usuario",
+        "operationId": "put_api_usuarios_id_tipo",
+        "description": "Proprio usuario ou administrador. Documento valido exigido para guia/agencia. Verificacao e reiniciada.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com registro ou estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TipoUsuario"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/{id}/contato-emergencia": {
+      "get": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Consultar contato de emergencia",
+        "operationId": "get_api_usuarios_id_contato_emergencia",
+        "description": "Guia/agencia com reserva nao cancelada sob sua responsabilidade, ou administrador. O servico atual tambem considera reservas concluidas.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Emergencia"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trilhas/": {
+      "get": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Listar trilhas",
+        "operationId": "get_api_trilhas",
+        "description": "Lista atual nao filtra trilhas inativas; busca avancada filtra ativo=true.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trilha"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Criar trilha",
+        "operationId": "post_api_trilhas",
+        "description": "Somente guia ou agencia. Responsavel padrao e a conta autenticada. Outro guia exige vinculo aceito.",
+        "responses": {
+          "201": {
+            "description": "Registro criado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Criacao"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrilhaNova"
+              },
+              "example": {
+                "nome": "Trilha do Mirante",
+                "descricao": "Percurso com vista panoramica.",
+                "dificuldade": "Facil",
+                "cidade": "Maringa",
+                "estado": "PR",
+                "data_atividade": "2026-10-20",
+                "preco": 50,
+                "itens_recomendados": [
+                  "Agua",
+                  "Protetor solar"
+                ],
+                "trajeto": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trilhas/busca": {
+      "get": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Buscar trilhas com filtros",
+        "operationId": "get_api_trilhas_busca",
+        "description": "Somente trilhas ativas. Busca geografica exige latitude, longitude e raio_km juntos. Resultado vazio retorna 404 com mensagem; busca geografica ordena por distancia.",
+        "parameters": [
+          {
+            "name": "cidade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dificuldade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "data_inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-10-20"
+            }
+          },
+          {
+            "name": "data_fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-10-20"
+            }
+          },
+          {
+            "name": "acessivel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "latitude",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "longitude",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "raio_km",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trilha"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nenhuma trilha encontrada com os filtros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trilhas/periodo": {
+      "get": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Listar trilhas por periodo",
+        "operationId": "get_api_trilhas_periodo",
+        "parameters": [
+          {
+            "name": "data_inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-10-20"
+            }
+          },
+          {
+            "name": "data_fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-10-20"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trilha"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nenhuma trilha encontrada no periodo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trilhas/{id_trilha}": {
+      "get": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Consultar trilha",
+        "operationId": "get_api_trilhas_id_trilha",
+        "parameters": [
+          {
+            "name": "id_trilha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trilha"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Atualizar trilha",
+        "operationId": "put_api_trilhas_id_trilha",
+        "description": "Criador, responsavel ou administrador. Envie ao menos um campo. Mudanca de guia exige permissao de atribuicao.",
+        "parameters": [
+          {
+            "name": "id_trilha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrilhaEditavel"
+              },
+              "example": {
+                "preco": 60,
+                "ativo": true
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Desativar trilha",
+        "operationId": "delete_api_trilhas_id_trilha",
+        "description": "Criador, responsavel ou administrador. Define ativo=false e preserva reservas existentes.",
+        "parameters": [
+          {
+            "name": "id_trilha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trilhas/{id_trilha}/clima": {
+      "get": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Consultar previsao do tempo",
+        "operationId": "get_api_trilhas_id_trilha_clima",
+        "description": "Requer coordenadas cadastradas. Previsao de ate 16 dias. Previsao da data da trilha pode ser nula.",
+        "parameters": [
+          {
+            "name": "id_trilha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Clima"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha no servico externo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trilhas/{id_trilha}/rota-ate-destino": {
+      "get": {
+        "tags": [
+          "Trilhas"
+        ],
+        "summary": "Calcular rota ate inicio da trilha",
+        "operationId": "get_api_trilhas_id_trilha_rota_ate_destino",
+        "description": "Latitude e longitude da origem sao obrigatorias. Requer coordenadas da trilha e ORS_API_KEY no servidor.",
+        "parameters": [
+          {
+            "name": "id_trilha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          },
+          {
+            "name": "latitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "example": -23.42
+            }
+          },
+          {
+            "name": "longitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "example": -51.93
+            }
+          },
+          {
+            "name": "perfil",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "driving-car",
+              "enum": [
+                "driving-car",
+                "driving-hgv",
+                "cycling-regular",
+                "cycling-road",
+                "cycling-mountain",
+                "cycling-electric",
+                "foot-walking",
+                "foot-hiking",
+                "wheelchair"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rota"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha no servico externo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agendamentos/": {
+      "post": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Agendar trilha",
+        "operationId": "post_api_agendamentos",
+        "description": "Usuario, guia ou agencia. id_usuario e definido pelo JWT; id_guia vem da trilha. Nao ha pagamento online nesta operacao.",
+        "responses": {
+          "201": {
+            "description": "Registro criado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Criacao"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com registro ou estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgendamentoNovo"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agendamentos/usuario/{id_usuario}": {
+      "get": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Listar reservas de usuario",
+        "operationId": "get_api_agendamentos_usuario_id_usuario",
+        "description": "Proprio usuario ou administrador.",
+        "parameters": [
+          {
+            "name": "id_usuario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Agendamento"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agendamentos/guia/{id_guia}": {
+      "get": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Listar reservas de guia",
+        "operationId": "get_api_agendamentos_guia_id_guia",
+        "description": "Guia consulta propria agenda. Agencia ou administrador podem consultar outra agenda na implementacao atual.",
+        "parameters": [
+          {
+            "name": "id_guia",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Agendamento"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agendamentos/dashboard/{id_guia}": {
+      "get": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Consultar dashboard",
+        "operationId": "get_api_agendamentos_dashboard_id_guia",
+        "description": "Proprio guia/agencia ou administrador. Inclui referencias por ID e e-mail legado sem duplicar.",
+        "parameters": [
+          {
+            "name": "id_guia",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agendamentos/{id_agendamento}/cancelar": {
+      "put": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Cancelar reserva",
+        "operationId": "put_api_agendamentos_id_agendamento_cancelar",
+        "description": "Dono da reserva, responsavel ou administrador.",
+        "parameters": [
+          {
+            "name": "id_agendamento",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agendamentos/{id_agendamento}/checkin": {
+      "put": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Iniciar trilha",
+        "operationId": "put_api_agendamentos_id_agendamento_checkin",
+        "description": "Dono da reserva, responsavel ou administrador. Exige status agendado. Coordenadas opcionais sao registradas somente se latitude e longitude forem enviadas juntas.",
+        "parameters": [
+          {
+            "name": "id_agendamento",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Checkin"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agendamentos/{id_agendamento}/checkout": {
+      "put": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Concluir trilha",
+        "operationId": "put_api_agendamentos_id_agendamento_checkout",
+        "description": "Dono da reserva, responsavel ou administrador. Exige status em_andamento.",
+        "parameters": [
+          {
+            "name": "id_agendamento",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agendamentos/testar-lembretes": {
+      "post": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Disparar lembretes manualmente",
+        "operationId": "post_api_agendamentos_testar_lembretes",
+        "description": "Exclusivo de administrador. Executa envio real de lembretes se integracoes estiverem configuradas.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/favoritos/": {
+      "get": {
+        "tags": [
+          "Favoritos"
+        ],
+        "summary": "Listar trilhas favoritas",
+        "operationId": "get_api_favoritos",
+        "description": "Favoritos da conta autenticada.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trilha"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Favoritos"
+        ],
+        "summary": "Adicionar favorito",
+        "operationId": "post_api_favoritos",
+        "description": "Novo favorito retorna 201; favorito existente retorna 200.",
+        "responses": {
+          "200": {
+            "description": "Trilha ja esta nos favoritos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Registro criado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FavoritoNovo"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/favoritos/{id_trilha}": {
+      "delete": {
+        "tags": [
+          "Favoritos"
+        ],
+        "summary": "Remover favorito",
+        "operationId": "delete_api_favoritos_id_trilha",
+        "parameters": [
+          {
+            "name": "id_trilha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/avaliacoes/": {
+      "post": {
+        "tags": [
+          "Avaliacoes"
+        ],
+        "summary": "Avaliar trilha concluida",
+        "operationId": "post_api_avaliacoes",
+        "description": "Requer reserva concluida da conta autenticada. Uma avaliacao por usuario/trilha. Atualiza media da trilha.",
+        "responses": {
+          "201": {
+            "description": "Registro criado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com registro ou estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvaliacaoNova"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/avaliacoes/trilha/{id_trilha}": {
+      "get": {
+        "tags": [
+          "Avaliacoes"
+        ],
+        "summary": "Listar avaliacoes",
+        "operationId": "get_api_avaliacoes_trilha_id_trilha",
+        "parameters": [
+          {
+            "name": "id_trilha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Avaliacao"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guias": {
+      "get": {
+        "tags": [
+          "Guias"
+        ],
+        "summary": "Consultar catalogo de guias ativos",
+        "operationId": "get_api_guias",
+        "description": "Retorno publico reduzido, mas consulta exige autenticacao.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GuiaPublico"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/convites-guias": {
+      "get": {
+        "tags": [
+          "Convites"
+        ],
+        "summary": "Listar convites e vinculos",
+        "operationId": "get_api_convites_guias",
+        "description": "Retorna somente convites dos quais a conta autenticada participa.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Convite"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Convites"
+        ],
+        "summary": "Convidar guia",
+        "operationId": "post_api_convites_guias",
+        "description": "Somente agencia convida guia ativo. Criacao retorna 200 nesta implementacao.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Convite"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com registro ou estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConviteNovo"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/convites-guias/{invitation_id}": {
+      "put": {
+        "tags": [
+          "Convites"
+        ],
+        "summary": "Aceitar ou recusar convite",
+        "operationId": "put_api_convites_guias_invitation_id",
+        "description": "Somente guia convidado. Convite precisa estar pendente. Resposta e unica.",
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ID_REAL_DO_REGISTRO"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Convite"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissao insuficiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registro nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com registro ou estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConviteResposta"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/fcm-token": {
+      "post": {
+        "tags": [
+          "Notificacoes"
+        ],
+        "summary": "Registrar dispositivo FCM",
+        "operationId": "post_api_usuarios_fcm_token",
+        "description": "Contrato unico por instalacao, usando dispositivos_fcm. Substitui token antigo da mesma instalacao e conta. Testes e eventos de reserva usam o mesmo servico de envio.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Dispositivo"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Notificacoes"
+        ],
+        "summary": "Remover dispositivo FCM",
+        "operationId": "delete_api_usuarios_fcm_token",
+        "description": "Recebe dispositivo_id na query, nao no JSON. Remove apenas dispositivos da conta autenticada.",
+        "parameters": [
+          {
+            "name": "dispositivo_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "example": "minha-instalacao-web"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensagem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/fcm-token/teste": {
+      "post": {
+        "tags": [
+          "Notificacoes"
+        ],
+        "summary": "Testar push na propria conta",
+        "operationId": "post_api_usuarios_fcm_token_teste",
+        "description": "Envia aos dispositivos da propria conta pelo mesmo servico dos eventos de reserva. Contadores representam aceitacao pelo FCM, nao recebimento real.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushResultado"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/uploads/imagem": {
+      "post": {
+        "tags": [
+          "Uploads"
+        ],
+        "summary": "Enviar imagem",
+        "operationId": "post_api_uploads_imagem",
+        "description": "Qualquer usuario autenticado. Envie arquivo no campo image. Requer IMGBB_API_KEY e URL_IMGBB.",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos ou obrigatorios ausentes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Falha na integracao de upload; pode propagar status HTTP do ImgBB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "image"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Obtenha token no login e cole apenas o JWT no botao Authorize."
+      }
+    },
+    "schemas": {
+      "Erro": {
+        "type": "object",
+        "properties": {
+          "erro": {
+            "type": "string"
+          },
+          "detalhes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "erro"
+        ]
+      },
+      "Mensagem": {
+        "type": "object",
+        "properties": {
+          "mensagem": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mensagem"
+        ]
+      },
+      "Criacao": {
+        "type": "object",
+        "properties": {
+          "mensagem": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mensagem",
+          "id"
+        ]
+      },
+      "Login": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "turista@example.com"
+          },
+          "senha": {
+            "type": "string",
+            "format": "password",
+            "example": "senha123"
+          }
+        },
+        "required": [
+          "email",
+          "senha"
+        ]
+      },
+      "Sessao": {
+        "type": "object",
+        "properties": {
+          "mensagem": {
+            "type": "string"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mensagem",
+          "nome",
+          "tipo",
+          "id",
+          "token"
+        ]
+      },
+      "Email": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "turista@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "NovaSenha": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token de recuperacao enviado por e-mail; nao e o JWT da sessao."
+          },
+          "nova_senha": {
+            "type": "string",
+            "format": "password",
+            "minLength": 6,
+            "example": "novaSenha123"
+          }
+        },
+        "required": [
+          "token",
+          "nova_senha"
+        ]
+      },
+      "Cadastro": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Ana Silva"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ana@example.com"
+          },
+          "senha": {
+            "type": "string",
+            "format": "password",
+            "example": "senha123"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "usuario",
+              "guia",
+              "agencia"
+            ],
+            "default": "usuario"
+          },
+          "documento": {
+            "type": "string",
+            "description": "CPF ou CNPJ valido e unico. Obrigatorio para guia e agencia."
+          },
+          "telefone": {
+            "type": "string"
+          },
+          "cidade": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "contato_emergencia_nome": {
+            "type": "string"
+          },
+          "contato_emergencia_telefone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "nome",
+          "email",
+          "senha"
+        ]
+      },
+      "PerfilEditavel": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "telefone": {
+            "type": "string"
+          },
+          "cidade": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "documento": {
+            "type": "string",
+            "description": "CPF ou CNPJ valido e unico."
+          },
+          "foto_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "contato_emergencia_nome": {
+            "type": "string"
+          },
+          "contato_emergencia_telefone": {
+            "type": "string"
+          }
+        }
+      },
+      "Usuario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nome": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "telefone": {
+            "type": "string",
+            "nullable": true
+          },
+          "cidade": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "nullable": true
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "documento": {
+            "type": "string",
+            "nullable": true
+          },
+          "tipo_documento": {
+            "type": "string",
+            "nullable": true
+          },
+          "contato_emergencia_nome": {
+            "type": "string",
+            "nullable": true
+          },
+          "contato_emergencia_telefone": {
+            "type": "string",
+            "nullable": true
+          },
+          "foto_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "verificado": {
+            "type": "boolean"
+          },
+          "ativo": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp serializado pelo Flask."
+          }
+        }
+      },
+      "Verificacao": {
+        "type": "object",
+        "properties": {
+          "verificado": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "TipoUsuario": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "usuario",
+              "guia",
+              "agencia"
+            ]
+          },
+          "documento": {
+            "type": "string",
+            "description": "Obrigatorio ao mudar para guia/agencia se nao houver documento valido cadastrado."
+          }
+        },
+        "required": [
+          "tipo"
+        ]
+      },
+      "Emergencia": {
+        "type": "object",
+        "properties": {
+          "nome_participante": {
+            "type": "string",
+            "nullable": true
+          },
+          "telefone_participante": {
+            "type": "string",
+            "nullable": true
+          },
+          "contato_emergencia_nome": {
+            "type": "string",
+            "nullable": true
+          },
+          "contato_emergencia_telefone": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Ponto": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ]
+      },
+      "TrilhaEditavel": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Trilha do Mirante"
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Percurso com vista panoramica."
+          },
+          "dificuldade": {
+            "type": "string",
+            "example": "Facil"
+          },
+          "modalidade": {
+            "type": "string",
+            "default": "Trekking"
+          },
+          "distancia_km": {
+            "type": "number",
+            "example": 5
+          },
+          "cidade": {
+            "type": "string",
+            "example": "Maringa"
+          },
+          "estado": {
+            "type": "string",
+            "example": "PR"
+          },
+          "data_atividade": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-10-20"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "example": -23.42
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "example": -51.93
+          },
+          "imagem_url": {
+            "type": "string"
+          },
+          "acessivel": {
+            "type": "boolean",
+            "default": false
+          },
+          "itens_recomendados": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trajeto": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Ponto"
+            }
+          },
+          "id_guia": {
+            "type": "string",
+            "description": "ID do responsavel. Agencia precisa de convite aceito para atribuir outro guia."
+          },
+          "ativo": {
+            "type": "boolean",
+            "default": true
+          },
+          "preco": {
+            "type": "number",
+            "example": 50
+          }
+        }
+      },
+      "AgendamentoNovo": {
+        "type": "object",
+        "properties": {
+          "id_trilha": {
+            "type": "string",
+            "example": "ID_REAL_DO_REGISTRO"
+          },
+          "data_agendada": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-10-20"
+          },
+          "valor_pago": {
+            "type": "number",
+            "example": 50,
+            "description": "Valor declarado pelo cliente; nao confirma pagamento."
+          }
+        },
+        "required": [
+          "id_trilha",
+          "data_agendada",
+          "valor_pago"
+        ]
+      },
+      "Agendamento": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "id_usuario": {
+            "type": "string"
+          },
+          "id_trilha": {
+            "type": "string"
+          },
+          "id_guia": {
+            "type": "string",
+            "nullable": true
+          },
+          "data_agendada": {
+            "type": "string"
+          },
+          "valor_pago": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "agendado",
+              "em_andamento",
+              "concluido",
+              "cancelado"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "checkin_at": {
+            "type": "string"
+          },
+          "checkout_at": {
+            "type": "string"
+          },
+          "checkin_latitude": {
+            "type": "number"
+          },
+          "checkin_longitude": {
+            "type": "number"
+          }
+        }
+      },
+      "Checkin": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "properties": {
+          "total_agendamentos": {
+            "type": "integer"
+          },
+          "por_status": {
+            "type": "object",
+            "properties": {
+              "agendado": {
+                "type": "integer"
+              },
+              "em_andamento": {
+                "type": "integer"
+              },
+              "concluido": {
+                "type": "integer"
+              },
+              "cancelado": {
+                "type": "integer"
+              },
+              "outros": {
+                "type": "integer"
+              }
+            }
+          },
+          "valor_declarado_ativo": {
+            "type": "number",
+            "description": "Soma de valores declarados de reservas nao canceladas. Nao e conciliacao financeira."
+          }
+        }
+      },
+      "FavoritoNovo": {
+        "type": "object",
+        "properties": {
+          "id_trilha": {
+            "type": "string",
+            "example": "ID_REAL_DO_REGISTRO"
+          }
+        },
+        "required": [
+          "id_trilha"
+        ]
+      },
+      "AvaliacaoNova": {
+        "type": "object",
+        "properties": {
+          "id_trilha": {
+            "type": "string",
+            "example": "ID_REAL_DO_REGISTRO"
+          },
+          "nota": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "example": 5
+          },
+          "comentario": {
+            "type": "string",
+            "example": "Otimo percurso.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id_trilha",
+          "nota"
+        ]
+      },
+      "Avaliacao": {
+        "type": "object",
+        "properties": {
+          "id_usuario": {
+            "type": "string"
+          },
+          "id_trilha": {
+            "type": "string"
+          },
+          "nome_usuario": {
+            "type": "string",
+            "nullable": true
+          },
+          "nota": {
+            "type": "integer"
+          },
+          "comentario": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        }
+      },
+      "GuiaPublico": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "cidade": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "nullable": true
+          },
+          "foto_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "verificado": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ConviteNovo": {
+        "type": "object",
+        "properties": {
+          "id_guia": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "example": "ID_REAL_DO_GUIA",
+            "description": "ID de guia ativo; nao pode conter barra."
+          }
+        },
+        "required": [
+          "id_guia"
+        ]
+      },
+      "ConviteResposta": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "aceito",
+              "recusado"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "Convite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "participantes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id_agencia": {
+            "type": "string"
+          },
+          "id_guia": {
+            "type": "string"
+          },
+          "nome_agencia": {
+            "type": "string"
+          },
+          "nome_guia": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pendente",
+              "aceito",
+              "recusado"
+            ]
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "respondido_em": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Presente em consultas apos resposta; a resposta imediata ao PUT pode omitir este campo."
+          }
+        }
+      },
+      "Dispositivo": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "Token FCM do dispositivo; nao e JWT."
+          },
+          "dispositivo_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "example": "minha-instalacao-web"
+          }
+        },
+        "required": [
+          "token",
+          "dispositivo_id"
+        ]
+      },
+      "PushResultado": {
+        "type": "object",
+        "properties": {
+          "enviados": {
+            "type": "integer"
+          },
+          "falhas": {
+            "type": "integer"
+          }
+        }
+      },
+      "Upload": {
+        "type": "object",
+        "properties": {
+          "mensagem": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "PrevisaoDia": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-10-20"
+          },
+          "temperatura_maxima": {
+            "type": "number",
+            "nullable": true
+          },
+          "temperatura_minima": {
+            "type": "number",
+            "nullable": true
+          },
+          "probabilidade_chuva": {
+            "type": "number",
+            "nullable": true
+          },
+          "condicao": {
+            "type": "string"
+          }
+        }
+      },
+      "Clima": {
+        "type": "object",
+        "properties": {
+          "trilha": {
+            "type": "string",
+            "nullable": true
+          },
+          "data_atividade": {
+            "type": "string",
+            "nullable": true
+          },
+          "previsao_do_dia_da_trilha": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "string",
+                "format": "date",
+                "example": "2026-10-20"
+              },
+              "temperatura_maxima": {
+                "type": "number",
+                "nullable": true
+              },
+              "temperatura_minima": {
+                "type": "number",
+                "nullable": true
+              },
+              "probabilidade_chuva": {
+                "type": "number",
+                "nullable": true
+              },
+              "condicao": {
+                "type": "string"
+              }
+            },
+            "nullable": true
+          },
+          "previsao_completa": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrevisaoDia"
+            }
+          }
+        }
+      },
+      "Rota": {
+        "type": "object",
+        "properties": {
+          "distancia_km": {
+            "type": "number"
+          },
+          "duracao_minutos": {
+            "type": "number"
+          },
+          "perfil": {
+            "type": "string"
+          },
+          "trajeto": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Ponto"
+            }
+          }
+        }
+      },
+      "TrilhaNova": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Trilha do Mirante"
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Percurso com vista panoramica."
+          },
+          "dificuldade": {
+            "type": "string",
+            "example": "Facil"
+          },
+          "modalidade": {
+            "type": "string",
+            "default": "Trekking"
+          },
+          "distancia_km": {
+            "type": "number",
+            "example": 5
+          },
+          "cidade": {
+            "type": "string",
+            "example": "Maringa"
+          },
+          "estado": {
+            "type": "string",
+            "example": "PR"
+          },
+          "data_atividade": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-10-20"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "example": -23.42
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "example": -51.93
+          },
+          "imagem_url": {
+            "type": "string"
+          },
+          "acessivel": {
+            "type": "boolean",
+            "default": false
+          },
+          "itens_recomendados": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trajeto": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Ponto"
+            }
+          },
+          "id_guia": {
+            "type": "string",
+            "description": "ID do responsavel. Agencia precisa de convite aceito para atribuir outro guia."
+          },
+          "ativo": {
+            "type": "boolean",
+            "default": true
+          },
+          "preco": {
+            "type": "number",
+            "example": 50
+          }
+        },
+        "required": [
+          "nome",
+          "descricao",
+          "dificuldade"
+        ],
+        "description": "Se informar uma coordenada inicial, informe latitude e longitude juntas."
+      },
+      "Trilha": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Trilha do Mirante"
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Percurso com vista panoramica."
+          },
+          "dificuldade": {
+            "type": "string",
+            "example": "Facil"
+          },
+          "modalidade": {
+            "type": "string",
+            "default": "Trekking"
+          },
+          "distancia_km": {
+            "type": "number",
+            "example": 5
+          },
+          "cidade": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "nullable": true
+          },
+          "data_atividade": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "imagem_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "acessivel": {
+            "type": "boolean",
+            "default": false
+          },
+          "itens_recomendados": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trajeto": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Ponto"
+            }
+          },
+          "id_guia": {
+            "type": "string",
+            "description": "ID do responsavel. Agencia precisa de convite aceito para atribuir outro guia."
+          },
+          "ativo": {
+            "type": "boolean",
+            "default": true
+          },
+          "preco": {
+            "type": "number",
+            "example": 50
+          },
+          "id": {
+            "type": "string"
+          },
+          "geohash": {
+            "type": "string",
+            "nullable": true
+          },
+          "criado_por": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "nota_media": {
+            "type": "number",
+            "nullable": true
+          },
+          "total_avaliacoes": {
+            "type": "integer"
+          },
+          "distancia_usuario_km": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

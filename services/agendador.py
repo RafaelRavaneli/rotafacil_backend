@@ -1,13 +1,15 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 
-def enviar_lembretes_diarios():
+def enviar_lembretes_diarios(*, raise_errors=False):
     # Import tardio (dentro da função) para evitar import circular na inicialização do app
     from models.database import bd
     from services.notificacoes import Notificacoes
 
-    amanha = (dt.datetime.now() + dt.timedelta(days=1)).date()
+    agora = dt.datetime.now(ZoneInfo('America/Sao_Paulo'))
+    amanha = (agora + dt.timedelta(days=1)).date()
 
     try:
         agendamentos_ref = bd.collection('agendamentos').where('status', '==', 'agendado').stream()
@@ -30,9 +32,11 @@ def enviar_lembretes_diarios():
                     f"Não esqueça: '{nome_trilha}' está agendada para amanhã. Prepare sua mochila!",
                     dados={"tipo": "lembrete", "id_agendamento": doc.id}
                 )
-        print(f"[agendador] Lembretes diários verificados às {dt.datetime.now()}.")
+        print(f"[agendador] Lembretes diários verificados às {agora.isoformat()}.")
     except Exception as e:
         print(f"[agendador] Erro ao enviar lembretes diários: {e}")
+        if raise_errors:
+            raise
 
 
 def iniciar_agendador():

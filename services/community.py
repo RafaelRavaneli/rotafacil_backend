@@ -1,6 +1,5 @@
-"""Contratos de conversas, suporte, vínculos de guias e dispositivos FCM."""
+"""Contratos de catalogo de guias, vinculos e dispositivos FCM."""
 import hashlib
-import uuid
 from datetime import datetime, timezone
 from google.api_core.exceptions import AlreadyExists, FailedPrecondition
 from google.cloud.firestore_v1 import LastUpdateOption
@@ -61,81 +60,6 @@ class Community:
     def guides(db):
         return [guide_public(doc) for doc in db.collection('usuarios').where('tipo', '==', 'guia').stream()
                 if doc.to_dict().get('ativo', True)]
-
-    @staticmethod
-    def start_chat(db, user, data):
-        if user.get('tipo') != 'usuario':
-            raise CommunityError('A conversa deve ser iniciada pelo turista.', 403)
-        guide_id = guide_identifier(data)
-        guide = required(db.collection('usuarios').document(guide_id))
-        if guide.to_dict().get('tipo') != 'guia' or not guide.to_dict().get('ativo', True):
-            raise CommunityError('Guia indisponível.', 404)
-        chat_id = hashlib.sha256(f"{user['id']}:{guide_id}".encode()).hexdigest()
-        ref = db.collection('conversas').document(chat_id)
-        value = {'participantes': [user['id'], guide_id], 'id_usuario': user['id'],
-                 'id_guia': guide_id, 'nomes': {user['id']: user.get('nome', 'Turista'),
-                 guide_id: guide.to_dict().get('nome', 'Guia')}, 'criado_em': now()}
-        try:
-            ref.create(value)
-        except AlreadyExists:
-            pass
-        return row(required(ref))
-
-    @staticmethod
-    def chats(db, user):
-        return [row(doc) for doc in db.collection('conversas').where('participantes', 'array_contains', user['id']).stream()]
-
-    @staticmethod
-    def thread(db, user, collection, thread_id):
-        ref = db.collection(collection).document(thread_id)
-        doc = required(ref)
-        data = doc.to_dict()
-        allowed = user['id'] in data.get('participantes', []) if collection == 'conversas' else (
-            data.get('id_usuario') == user['id'] or user.get('tipo') == 'admin')
-        if not allowed:
-            raise CommunityError('Você não tem acesso a esta conversa.', 403)
-        return ref
-
-    @staticmethod
-    def messages(db, user, collection, thread_id):
-        ref = Community.thread(db, user, collection, thread_id)
-        # A consulta usa um único campo e retorna as 100 mensagens mais recentes.
-        docs = ref.collection('mensagens').order_by('criado_em', direction='DESCENDING').limit(100).stream()
-        return sorted([row(doc) for doc in docs], key=lambda item: item['criado_em'])
-
-    @staticmethod
-    def send(db, user, collection, thread_id, data):
-        ref = Community.thread(db, user, collection, thread_id)
-        if collection == 'suporte' and ref.get().to_dict().get('status') == 'fechado':
-            raise CommunityError('Este atendimento está encerrado.', 409)
-        message = {'id': str(uuid.uuid4()), 'texto': text_value(data, 'texto'),
-                   'id_autor': user['id'], 'nome_autor': user.get('nome', 'Usuário'),
-                   'atendente': collection == 'suporte' and user.get('tipo') == 'admin',
-                   'criado_em': now()}
-        ref.collection('mensagens').document(message['id']).create(message)
-        return message
-
-    @staticmethod
-    def tickets(db, user):
-        query = db.collection('suporte')
-        if user.get('tipo') != 'admin':
-            query = query.where('id_usuario', '==', user['id'])
-        return [row(doc) for doc in query.stream()]
-
-    @staticmethod
-    def open_ticket(db, user, data):
-        subject = text_value(data, 'assunto', 120)
-        message = text_value(data, 'texto')
-        ref = db.collection('suporte').document(str(uuid.uuid4()))
-        ticket = {'id': ref.id, 'id_usuario': user['id'], 'assunto': subject,
-                  'status': 'aberto', 'criado_em': now()}
-        batch = db.batch()
-        batch.create(ref, ticket)
-        batch.create(ref.collection('mensagens').document(str(uuid.uuid4())),
-                     {'texto': message, 'id_autor': user['id'], 'nome_autor': user.get('nome', 'Usuário'),
-                      'atendente': user.get('tipo') == 'admin', 'criado_em': now()})
-        batch.commit()
-        return ticket
 
     @staticmethod
     def invite(db, user, data):
@@ -226,12 +150,13 @@ class PushDevices:
         return {'mensagem': 'Dispositivo removido.'}
 
     @staticmethod
-    def send(db, user_id, title, body):
+    def send(db, user_id, title, body, dados=None):
         results = {'enviados': 0, 'falhas': 0}
         for doc in db.collection('dispositivos_fcm').where('id_usuario', '==', user_id).stream():
             try:
                 messaging.send(messaging.Message(token=doc.to_dict()['token'],
-                    notification=messaging.Notification(title=title, body=body)))
+                    notification=messaging.Notification(title=title, body=body),
+                    data={key: str(value) for key, value in (dados or {}).items()}))
                 results['enviados'] += 1
             except messaging.UnregisteredError:
                 try:

@@ -84,29 +84,11 @@ class CommunityTests(unittest.TestCase):
     def denied(self, status, fn, *args):
         with self.assertRaises(CommunityError) as ctx: fn(*args)
         self.assertEqual(ctx.exception.status,status)
-    def test_chat_participantes_autoria_e_idempotencia(self):
-        chat=Community.start_chat(self.db,self.t,{'id_guia':'g'})
-        self.assertEqual(chat['id'],Community.start_chat(self.db,self.t,{'id_guia':'g'})['id'])
-        self.assertEqual(Community.chats(self.db,self.x),[])
-        self.denied(403,Community.messages,self.db,self.x,'conversas',chat['id'])
-        self.denied(403,Community.send,self.db,self.x,'conversas',chat['id'],{'texto':'oi'})
-        msg=Community.send(self.db,self.t,'conversas',chat['id'],{'texto':'Olá','id_autor':'g','atendente':True})
-        self.assertEqual(msg['id_autor'],'t'); self.assertFalse(msg['atendente'])
-        self.assertEqual(Community.messages(self.db,self.g,'conversas',chat['id'])[0]['texto'],'Olá')
-        self.denied(403,Community.start_chat,self.db,self.g,{'id_guia':'g'})
     def test_catalogo_nao_expoe_dados_privados(self):
         guide=Community.guides(self.db)[0]
         self.assertEqual(guide['id'],'g')
         for key in ('senha','email','documento'): self.assertNotIn(key,guide)
-        self.denied(400,Community.start_chat,self.db,self.t,{'id_guia':'g/x'})
-    def test_suporte_owner_e_admin_sem_falsificar_atendente(self):
-        ticket=Community.open_ticket(self.db,self.t,{'assunto':'Reserva','texto':'Ajuda'})
-        self.assertEqual(Community.tickets(self.db,self.x),[])
-        self.denied(403,Community.send,self.db,self.x,'suporte',ticket['id'],{'texto':'x'})
-        own=Community.send(self.db,self.t,'suporte',ticket['id'],{'texto':'Resposta','atendente':True})
-        admin=Community.send(self.db,self.users['admin'],'suporte',ticket['id'],{'texto':'Atendimento'})
-        self.assertFalse(own['atendente']);self.assertTrue(admin['atendente'])
-        self.assertEqual(len(Community.messages(self.db,self.t,'suporte',ticket['id'])),3)
+        self.denied(400,Community.invite,self.db,self.a,{'id_guia':'g/x'})
     def test_convite_aceite_e_vinculo_da_trilha(self):
         self.denied(403,Community.invite,self.db,self.t,{'id_guia':'g'})
         invite=Community.invite(self.db,self.a,{'id_guia':'g'})
@@ -140,16 +122,26 @@ class CommunityTests(unittest.TestCase):
     @patch.dict(os.environ, {'KEY':'test-key-only-'*4})
     def test_rotas_autenticadas_e_push_apenas_propria_conta(self):
         client=app.test_client()
-        for path in ['/api/guias','/api/conversas','/api/suporte','/api/convites-guias','/api/agendamentos/dashboard/g']:
+        for path in ['/api/guias','/api/convites-guias','/api/agendamentos/dashboard/g']:
             self.assertEqual(client.get(path).status_code,401)
         def headers(id):
             user=self.users[id]
             return {'Authorization':'Bearer '+Autenticacao.make_token(user['email'],id,user['tipo'])}
         with patch('services.autenticacao.firestore.client',return_value=self.db), patch('routes.community_routes.bd',self.db), patch('routes.agendamentos_routes.bd',self.db):
-            self.assertEqual(client.post('/api/conversas',json=[],headers=headers('t')).status_code,400)
-            self.assertEqual(client.post('/api/conversas',json={'id_guia':'g'},headers=headers('t')).status_code,200)
+            self.assertEqual(client.post('/api/convites-guias',json=[],headers=headers('a')).status_code,400)
             self.assertEqual(client.get('/api/agendamentos/dashboard/g',headers=headers('a')).status_code,403)
             self.assertEqual(client.get('/api/agendamentos/dashboard/g',headers=headers('g')).status_code,200)
             with patch('services.community.PushDevices.send',return_value={'enviados':0,'falhas':0}) as send:
                 client.post('/api/usuarios/fcm-token/teste',json={'id_usuario':'x'},headers=headers('t'))
                 self.assertEqual(send.call_args.args[1],'t')
+
+    def test_rotas_de_chat_removidas(self):
+        client = app.test_client()
+        paths = ('/api/conversas', '/api/conversas/exemplo/mensagens',
+                 '/api/suporte', '/api/suporte/exemplo/mensagens')
+        for path in paths:
+            for method in ('GET', 'POST'):
+                with self.subTest(path=path, method=method):
+                    self.assertEqual(client.open(path, method=method).status_code, 404)
+        for name in ('start_chat', 'chats', 'thread', 'messages', 'send', 'tickets', 'open_ticket'):
+            self.assertFalse(hasattr(Community, name))

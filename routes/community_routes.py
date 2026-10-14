@@ -32,30 +32,6 @@ def guides(user):
     return Community.guides(bd)
 
 
-@community_bp.route('/conversas', methods=['GET', 'POST'])
-@endpoint
-def chats(user):
-    return Community.chats(bd, user) if request.method == 'GET' else Community.start_chat(bd, user, body())
-
-
-@community_bp.route('/conversas/<thread_id>/mensagens', methods=['GET', 'POST'])
-@endpoint
-def chat_messages(user, thread_id):
-    return Community.messages(bd, user, 'conversas', thread_id) if request.method == 'GET' else Community.send(bd, user, 'conversas', thread_id, body())
-
-
-@community_bp.route('/suporte', methods=['GET', 'POST'])
-@endpoint
-def tickets(user):
-    return Community.tickets(bd, user) if request.method == 'GET' else Community.open_ticket(bd, user, body())
-
-
-@community_bp.route('/suporte/<thread_id>/mensagens', methods=['GET', 'POST'])
-@endpoint
-def support_messages(user, thread_id):
-    return Community.messages(bd, user, 'suporte', thread_id) if request.method == 'GET' else Community.send(bd, user, 'suporte', thread_id, body())
-
-
 @community_bp.route('/convites-guias', methods=['GET', 'POST'])
 @endpoint
 def invitations(user):
