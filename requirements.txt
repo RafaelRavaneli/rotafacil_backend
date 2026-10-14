@@ -1,4 +1,4 @@
-﻿anyio==4.12.1
+anyio==4.12.1
 apscheduler==3.11.3
 blinker==1.9.0
 CacheControl==0.14.4

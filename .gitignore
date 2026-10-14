@@ -3,3 +3,5 @@ firebase-key.json
 *.venv
 .env
 *__pycache__
+.vercel/
+public/static/openapi.json

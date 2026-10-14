@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "flask",
+  "buildCommand": "python preparar_vercel.py",
+  "functions": {
+    "app.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{venv/**,.venv/**,tests/**,.git/**,.vercel/**,.env,.env.*,firebase-key.json,**/__pycache__/**}"
+    }
+  }
+}

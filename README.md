@@ -82,3 +82,7 @@ Papéis de usuário disponíveis: `usuario`, `guia`, `agencia`, `admin`. O papel
 
 - Frontend (Flutter): `<link do repo do frontend>`
 - Documentação e backlog: `<link do repo rotafacil-docs>`
+
+## Hospedagem no Vercel
+
+Consulte [DEPLOY_VERCEL.md](DEPLOY_VERCEL.md) para publicar a API Flask em ambiente de testes, configurar Firebase por variável protegida e validar as limitações de upload, lembretes e plano gratuito.

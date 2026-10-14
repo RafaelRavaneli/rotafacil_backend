@@ -1,0 +1,10 @@
+.env
+.env.*
+firebase-key.json
+venv/
+.venv/
+.git/
+.vercel/
+tests/
+**/__pycache__/
+*.pyc
