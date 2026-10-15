@@ -26,6 +26,30 @@ class Trilhas:
         return eh_admin or eh_criador or eh_guia_responsavel
 
     @staticmethod
+    def _distancia_valida(value):
+        if isinstance(value, bool):
+            raise ValueError('Distância inválida')
+        number = float(str(value).strip().replace(',', '.'))
+        if not math.isfinite(number) or number <= 0:
+            raise ValueError('Distância inválida')
+        return number
+
+    @staticmethod
+    def _serializar_trilha(db, doc, responsaveis=None):
+        data = {**(doc.to_dict() or {}), 'id': doc.id}
+        cache = responsaveis if responsaveis is not None else {}
+        identifier = data.get('id_guia')
+        if isinstance(identifier, str) and identifier and '/' not in identifier:
+            if identifier not in cache:
+                user = db.collection('usuarios').document(identifier).get()
+                if not user.exists:
+                    user = next(iter(db.collection('usuarios').where('email', '==', identifier).stream()), None)
+                public_name = (user.to_dict() or {}).get('nome') if user is not None and user.exists else None
+                cache[identifier] = public_name if isinstance(public_name, str) and public_name.strip() else None
+            data['nome_guia'] = cache[identifier]
+        return data
+
+    @staticmethod
     def _tem_agendamentos_ativos(db, id_trilha):
         finais = {'cancelado', 'cancelada', 'cancelled', 'canceled', 'concluido', 'concluído', 'completed'}
         for doc in db.collection('agendamentos').where('id_trilha', '==', id_trilha).stream():
@@ -95,6 +119,12 @@ class Trilhas:
                 if campo not in dados:
                     return {"erro": f"Campo obrigatório: {campo}"}, 400
 
+            if 'distancia_km' in dados:
+                try:
+                    dados['distancia_km'] = Trilhas._distancia_valida(dados['distancia_km'])
+                except (TypeError, ValueError):
+                    return {'erro': 'Informe uma distância do percurso válida, maior que zero, em quilômetros.'}, 400
+
             latitude = dados.get("latitude")
             longitude = dados.get("longitude")
             geohash = None
@@ -156,7 +186,8 @@ class Trilhas:
     def listar_trilhas(db):
         try:
             trilhas_ref = db.collection('trilhas').stream()
-            trilhas = [doc.to_dict() for doc in trilhas_ref]
+            responsaveis = {}
+            trilhas = [Trilhas._serializar_trilha(db, doc, responsaveis) for doc in trilhas_ref]
             return trilhas, 200
         except Exception as e:
             return {"erro": f"Erro ao buscar trilhas: {str(e)}"}, 500
@@ -166,7 +197,7 @@ class Trilhas:
         try:
             doc_ref = db.collection('trilhas').document(id_trilha).get()
             if doc_ref.exists:
-                return doc_ref.to_dict(), 200
+                return Trilhas._serializar_trilha(db, doc_ref), 200
             return {"erro": "Trilha não encontrada"}, 404
         except Exception as e:
             return {"erro": f"Erro ao buscar trilha: {str(e)}"}, 500
@@ -179,7 +210,8 @@ class Trilhas:
                 .where('data_atividade', '>=', data_inicio)\
                 .where('data_atividade', '<=', data_fim).stream()
             
-            trilhas = [doc.to_dict() for doc in trilhas_ref]
+            responsaveis = {}
+            trilhas = [Trilhas._serializar_trilha(db, doc, responsaveis) for doc in trilhas_ref]
             
             if trilhas:
                 return trilhas, 200
@@ -192,6 +224,12 @@ class Trilhas:
         try:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
+
+            if 'distancia_km' in dados:
+                try:
+                    dados['distancia_km'] = Trilhas._distancia_valida(dados['distancia_km'])
+                except (TypeError, ValueError):
+                    return {'erro': 'Informe uma distância do percurso válida, maior que zero, em quilômetros.'}, 400
 
             if "latitude" in dados and "longitude" in dados:
                 try:
@@ -280,7 +318,8 @@ class Trilhas:
                     query = query.where(filter=FieldFilter('data_atividade', '<=', filtros.get('data_fim')))
 
             resultados = query.stream()
-            lista_trilhas = [doc.to_dict() for doc in resultados]
+            responsaveis = {}
+            lista_trilhas = [Trilhas._serializar_trilha(db, doc, responsaveis) for doc in resultados]
 
             if busca_geografica:
                 # Filtro de data em Python, já que não pôde ir no Firestore junto do geohash

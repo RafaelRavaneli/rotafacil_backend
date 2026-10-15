@@ -41,3 +41,10 @@ Esta alteracao remove implementacoes e contratos de mensagens. Nao executa exclu
 ## Desativação de trilhas com reservas
 
 DELETE /api/trilhas/<id> desativa a trilha e preserva documentos. Se houver reservas não encerradas, responde HTTP 409 e mantém a trilha ativa. A mesma regra vale para PUT com ativo=false. Apenas cancelamentos e conclusões liberam a desativação; registros históricos não são removidos. Falha na consulta impede a desativação e retorna erro.
+
+
+## Dados exibidos nas trilhas
+
+As respostas de listagem, busca e detalhe acrescentam nome_guia com o nome público do responsável referenciado por id_guia, incluindo identificadores antigos por e-mail. Apenas o nome é incorporado do documento de usuário; nenhum campo privado adicional é retornado. A ausência de responsável válido resulta em nome_guia nulo.
+
+distancia_km, quando enviado em criação ou edição, deve ser numérico, positivo e finito. Vírgula decimal é normalizada para ponto antes da persistência. Valores inválidos retornam HTTP 400. Registros antigos sem distância estruturada não são corrigidos automaticamente a partir da descrição.

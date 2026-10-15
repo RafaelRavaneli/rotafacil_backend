@@ -186,6 +186,37 @@ class CommunityTests(unittest.TestCase):
             self.assertEqual(Trilhas.deletar_trilha(self.db,'t1',self.g)[1],500)
         self.assertTrue(self.db.collection('trilhas').document('t1').get().to_dict()['ativo'])
 
+    def test_trilha_mostra_nome_publico_do_responsavel_por_id_e_email(self):
+        self.db.collection('usuarios').document('g').update({'nome':'Mateus Guia'})
+        for trail_id,owner in [('t1','g'),('t2','g@example.test'),('t3','nao-existe')]:
+            self.db.collection('trilhas').document(trail_id).set({'nome':trail_id,'id_guia':owner,'distancia_km':'15,5'})
+        rows,status=Trilhas.listar_trilhas(self.db)
+        self.assertEqual(status,200)
+        by_id={row['id']:row for row in rows}
+        for trail_id in ('t1','t2'):
+            self.assertEqual(by_id[trail_id]['nome_guia'],'Mateus Guia')
+            for private in ('senha','documento','telefone','email'):
+                self.assertNotIn(private,by_id[trail_id])
+        self.assertIsNone(by_id['t3']['nome_guia'])
+        detail,status=Trilhas.buscar_trilha_por_id(self.db,'t1')
+        self.assertEqual(status,200)
+        self.assertEqual(detail['nome_guia'],'Mateus Guia')
+
+    def test_distancia_invalida_nao_salva_e_decimal_persiste(self):
+        base={'nome':'Trilha','descricao':'Percurso','dificuldade':'Fácil'}
+        for value in ('',0,-2,'NaN','Infinity',None,True):
+            result,status=Trilhas.cadastrar_trilha(self.db,{**base,'distancia_km':value},self.g)
+            self.assertEqual(status,400,result)
+        self.assertEqual(len(self.db.collection('trilhas').stream()),0)
+        result,status=Trilhas.cadastrar_trilha(self.db,{**base,'distancia_km':'15,5'},self.g)
+        self.assertEqual(status,201,result)
+        ref=self.db.collection('trilhas').document(result['id'])
+        self.assertEqual(ref.get().to_dict()['distancia_km'],15.5)
+        self.assertEqual(Trilhas.atualizar_trilha(self.db,result['id'],{'distancia_km':-1},self.g)[1],400)
+        self.assertEqual(ref.get().to_dict()['distancia_km'],15.5)
+        self.assertEqual(Trilhas.atualizar_trilha(self.db,result['id'],{'distancia_km':'12,75'},self.g)[1],200)
+        self.assertEqual(ref.get().to_dict()['distancia_km'],12.75)
+
     def test_rotas_de_chat_removidas(self):
         client = app.test_client()
         paths = ('/api/conversas', '/api/conversas/exemplo/mensagens',
