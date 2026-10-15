@@ -2,7 +2,7 @@ import jwt
 import datetime
 import os
 from dotenv import load_dotenv
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from flask import request, jsonify
 from functools import wraps
 from firebase_admin import firestore
@@ -29,7 +29,7 @@ class Autenticacao:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
 
-            email_recebido = dados.get('email')
+            email_recebido = str(dados.get('email') or '').strip().lower()
             senha_recebida = dados.get('senha')
 
             if not email_recebido or not senha_recebida:
@@ -39,11 +39,14 @@ class Autenticacao:
             docs = list(usuarios_ref)
 
             if not docs:
-                return {"erro": "Usuário não encontrado"}, 404
+                return {"erro": "Credenciais inválidas"}, 401
 
             # Extrai os dados do usuário encontrado no banco
             usuario_dados = docs[0].to_dict()
             senha_salva_no_banco = usuario_dados.get('senha')
+
+            if not usuario_dados.get('ativo', True) or not senha_salva_no_banco:
+                return {"erro": "Credenciais inválidas"}, 401
 
             if check_password_hash(senha_salva_no_banco, senha_recebida):
                 nome_do_usuario = usuario_dados.get('nome', 'Usuário')
@@ -67,6 +70,33 @@ class Autenticacao:
 
         except Exception as e:
             return {"erro": f"Ocorreu um erro no login: {str(e)}"}, 500
+
+    @staticmethod
+    def alterar_senha(db, usuario_atual, dados):
+        try:
+            dados = dados or {}
+            senha_atual = dados.get('senha_atual')
+            nova_senha = dados.get('nova_senha')
+            if not senha_atual or not nova_senha:
+                return {"erro": "Senha atual e nova senha são obrigatórias"}, 400
+            if len(nova_senha) < 6:
+                return {"erro": "A nova senha deve ter no mínimo 6 caracteres"}, 400
+            if senha_atual == nova_senha:
+                return {"erro": "A nova senha deve ser diferente da senha atual"}, 400
+
+            usuario_id = usuario_atual.get('id')
+            doc_ref = db.collection('usuarios').document(usuario_id)
+            doc = doc_ref.get()
+            if not doc.exists:
+                return {"erro": "Usuário não encontrado"}, 404
+            senha_salva = (doc.to_dict() or {}).get('senha')
+            if not senha_salva or not check_password_hash(senha_salva, senha_atual):
+                return {"erro": "Senha atual incorreta"}, 401
+
+            doc_ref.update({'senha': generate_password_hash(nova_senha)})
+            return {"mensagem": "Senha alterada com sucesso."}, 200
+        except Exception as e:
+            return {"erro": f"Ocorreu um erro ao alterar a senha: {str(e)}"}, 500
 
 
 def token_obrigatorio(f):

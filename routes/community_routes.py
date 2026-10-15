@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify
 from models.database import bd
 from services.autenticacao import token_obrigatorio
 from services.community import Community, CommunityError, PushDevices
+from services.notificacoes import Notificacoes
 
 community_bp = Blueprint('community', __name__)
 
@@ -32,6 +33,12 @@ def guides(user):
     return Community.guides(bd)
 
 
+@community_bp.route('/guias/<guide_id>', methods=['GET'])
+@endpoint
+def guide(user, guide_id):
+    return Community.guide(bd, guide_id)
+
+
 @community_bp.route('/convites-guias', methods=['GET', 'POST'])
 @endpoint
 def invitations(user):
@@ -44,6 +51,12 @@ def answer_invitation(user, invitation_id):
     return Community.answer_invitation(bd, user, invitation_id, body())
 
 
+@community_bp.route('/convites-guias/<invitation_id>/<action>', methods=['PUT'])
+@endpoint
+def manage_invitation(user, invitation_id, action):
+    return Community.manage_invitation(bd, user, invitation_id, action)
+
+
 @community_bp.route('/usuarios/fcm-token', methods=['POST', 'DELETE'])
 @endpoint
 def devices(user):
@@ -54,4 +67,7 @@ def devices(user):
 @endpoint
 def test_push(user):
     # Somente a própria conta pode receber a mensagem de teste.
-    return PushDevices.send(bd, user['id'], 'RotaFácil', 'Notificações ativadas neste dispositivo.')
+    return Notificacoes.notificar_usuario(
+        bd, user['id'], 'RotaFácil',
+        'Notificações ativadas neste dispositivo.',
+        {'tipo': 'sistema'})

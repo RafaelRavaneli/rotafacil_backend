@@ -72,11 +72,16 @@ Papéis de usuário disponíveis: `usuario`, `guia`, `agencia`, `admin`. O papel
 
 | Módulo | Base | Observação |
 |---|---|---|
-| Usuários | `/api/usuarios` | Cadastro público; demais rotas exigem dono ou admin |
+| Usuários | `/api/usuarios` | Cadastro público; demais rotas exigem dono ou admin; exclusão bloqueia reservas ativas |
 | Autenticação | `/api/auth/login` | Retorna token JWT |
+| Alteração de senha | `PUT /api/auth/senha` | Exige JWT, senha atual e nova senha |
 | Trilhas | `/api/trilhas` | Criação restrita a `guia`/`agencia` |
-| Agendamentos | `/api/agendamentos` | Restrito a `usuario`/`agencia`/`guia` |
-| Uploads | `/api/uploads/imagem` | Qualquer usuário autenticado |
+| Agendamentos | `/api/agendamentos` | Somente turista cria reserva; participante cancela antes do início; guia/agência responsável faz check-in e check-out |
+| Uploads | `/api/uploads/imagem` | Qualquer usuário autenticado; JPG, PNG ou WEBP de até 5 MB |
+| Avaliações | `/api/avaliacoes` | Turista avalia após concluir a reserva; comentário de até 500 caracteres |
+| Documentos profissionais | `/api/documentos-profissionais` | Arquivos privados para guia/agência; análise por admin |
+| Notificações | `/api/notificacoes` | Central persistida, leitura e preferências do próprio usuário |
+| Guias | `GET /api/guias` e `GET /api/guias/<id>` | Catálogo e perfil público sanitizado; nunca expõe documento, e-mail ou telefone |
 
 ## Repositórios relacionados
 

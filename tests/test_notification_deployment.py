@@ -35,6 +35,31 @@ class NotificationDeploymentTests(unittest.TestCase):
                          {'web-token', 'phone-token'})
         for call in send.call_args_list:
             self.assertEqual(call.args[0].data, {'tipo': 'reserva', 'numero': '123'})
+        notifications = list(self.db.collection('notificacoes').stream())
+        self.assertEqual(len(notifications), 1)
+        self.assertEqual(notifications[0].to_dict()['titulo'], 'Reserva')
+
+    def test_preferencias_controlam_eventos_e_central_persistida(self):
+        result,status=Notificacoes.atualizar_preferencias(
+            self.db,self.user,{'agendamentos':False,'push':False})
+        self.assertEqual(status,200,result)
+        with patch('services.notificacoes.PushDevices.send') as send:
+            self.assertEqual(Notificacoes.notificar_usuario(
+                self.db,'u1','Reserva','Confirmada',{'tipo':'reserva'}),
+                {'enviados':0,'falhas':0})
+            send.assert_not_called()
+        self.assertEqual(len(self.db.collection('notificacoes').stream()),0)
+
+        Notificacoes.notificar_usuario(
+            self.db,'u1','Sistema','Atualização',{'tipo':'sistema'})
+        items,status=Notificacoes.listar(self.db,self.user)
+        self.assertEqual(status,200,items)
+        self.assertEqual(len(items),1)
+        self.assertFalse(items[0]['lida'])
+        self.assertEqual(Notificacoes.marcar_lida(
+            self.db,self.user,items[0]['id'])[1],200)
+        self.assertTrue(self.db.collection('notificacoes')
+                        .document(items[0]['id']).get().to_dict()['lida'])
 
     def test_token_invalido_e_removido_sem_afetar_outro_dispositivo(self):
         from firebase_admin import messaging

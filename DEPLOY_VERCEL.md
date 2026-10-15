@@ -20,6 +20,7 @@ Preparação para testes do grupo. A publicação só está concluída quando o 
 | `CORS_ORIGINS` | Para os testes locais: `http://localhost:8080,http://127.0.0.1:8080`. Acrescente a origem exata do frontend publicado quando existir, sem barra final |
 | `IMGBB_API_KEY` | Credencial do upload de imagens |
 | `URL_IMGBB` | `https://api.imgbb.com/1/upload` |
+| `FIREBASE_STORAGE_BUCKET` | Bucket privado usado para documentos profissionais |
 | `EMAIL_REMETENTE` | Conta utilizada na recuperação de senha |
 | `EMAIL_SENHA_APP` | Senha de aplicativo do e-mail; validar SMTP na hospedagem |
 | `ORS_API_KEY` | Manter somente se o serviço de rotas existente for utilizado |

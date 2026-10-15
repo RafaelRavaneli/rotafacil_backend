@@ -1,16 +1,67 @@
 import uuid
+from datetime import date
 from firebase_admin import firestore
 from services.notificacoes import Notificacoes
 
 class Agendamentos:
+    STATUS_ATIVOS = {'agendado', 'pendente', 'confirmado', 'em_andamento'}
+
     @staticmethod
-    def _usuario_pode_gerenciar_agendamento(dados_agendamento, usuario_atual):
+    def _status_ativo(status):
+        return str(status or '').strip().lower() in Agendamentos.STATUS_ATIVOS
+
+    @staticmethod
+    def _serializar(db, dados, usuarios=None, trilhas=None):
+        item = dict(dados or {})
+        usuarios = usuarios if usuarios is not None else {}
+        trilhas = trilhas if trilhas is not None else {}
+        usuario_id = item.get('id_usuario')
+        trilha_id = item.get('id_trilha')
+        if usuario_id and usuario_id not in usuarios:
+            doc = db.collection('usuarios').document(usuario_id).get()
+            usuarios[usuario_id] = (doc.to_dict() or {}).get('nome') if doc.exists else None
+        if trilha_id and trilha_id not in trilhas:
+            doc = db.collection('trilhas').document(trilha_id).get()
+            trilhas[trilha_id] = (doc.to_dict() or {}).get('nome') if doc.exists else None
+        item['nome_usuario'] = usuarios.get(usuario_id)
+        item['nome_trilha'] = trilhas.get(trilha_id)
+        return item
+
+    @staticmethod
+    def _usuario_pode_gerenciar_agendamento(db, dados_agendamento, usuario_atual):
         papel = (usuario_atual.get('tipo') or '').strip().lower()
         usuario_id = usuario_atual.get('id')
         eh_admin = papel == 'admin'
         eh_dono = usuario_id == dados_agendamento.get('id_usuario')
         eh_guia_responsavel = dados_agendamento.get('id_guia') in {usuario_id, usuario_atual.get('email')} - {None, ''}
-        return eh_admin or eh_dono or eh_guia_responsavel
+        eh_agencia_proprietaria = False
+        if papel == 'agencia':
+            trilha = db.collection('trilhas').document(
+                dados_agendamento.get('id_trilha')).get()
+            aliases = {usuario_id, usuario_atual.get('email')} - {None, ''}
+            eh_agencia_proprietaria = (
+                trilha.exists and
+                (trilha.to_dict() or {}).get('criado_por') in aliases
+            )
+        return (eh_admin or eh_dono or eh_guia_responsavel or
+                eh_agencia_proprietaria)
+
+    @staticmethod
+    def _usuario_pode_operar_agendamento(db, dados_agendamento, usuario_atual):
+        papel = (usuario_atual.get('tipo') or '').strip().lower()
+        usuario_id = usuario_atual.get('id')
+        if papel == 'admin':
+            return True
+        if papel == 'guia':
+            aliases = {usuario_id, usuario_atual.get('email')} - {None, ''}
+            return dados_agendamento.get('id_guia') in aliases
+        if papel == 'agencia':
+            trilha = db.collection('trilhas').document(
+                dados_agendamento.get('id_trilha')).get()
+            aliases = {usuario_id, usuario_atual.get('email')} - {None, ''}
+            return (trilha.exists and
+                    (trilha.to_dict() or {}).get('criado_por') in aliases)
+        return False
 
     @staticmethod
     def agendar_trilha(db, dados):
@@ -18,7 +69,7 @@ class Agendamentos:
             if not dados:
                 return {"erro": "Dados não enviados"}, 400
 
-            campos_obrigatorios = ["id_usuario", "id_trilha", "data_agendada", "valor_pago"]
+            campos_obrigatorios = ["id_usuario", "id_trilha", "data_agendada"]
             for campo in campos_obrigatorios:
                 if campo not in dados:
                     return {"erro": f"Campo obrigatório: {campo}"}, 400
@@ -32,14 +83,42 @@ class Agendamentos:
                 return {"erro": "Esta trilha não está disponível para agendamento."}, 409
             id_guia = dados_trilha.get("id_guia")
 
+            data_agendada = str(dados.get('data_agendada') or '').strip()
+            try:
+                if date.fromisoformat(data_agendada) < date.today():
+                    return {"erro": "Não é possível reservar uma data passada."}, 400
+            except ValueError:
+                return {"erro": "data_agendada deve estar no formato AAAA-MM-DD."}, 400
+
+            existentes = db.collection('agendamentos') \
+                .where('id_usuario', '==', dados['id_usuario']) \
+                .where('id_trilha', '==', dados['id_trilha']).stream()
+            if any(Agendamentos._status_ativo(doc.to_dict().get('status')) for doc in existentes):
+                return {"erro": "Você já possui uma reserva ativa para esta trilha."}, 409
+
+            capacidade = dados_trilha.get('capacidade')
+            if capacidade is not None:
+                try:
+                    capacidade = int(capacidade)
+                except (TypeError, ValueError):
+                    return {"erro": "A capacidade da atividade está inválida."}, 500
+                ocupadas = sum(
+                    1 for doc in db.collection('agendamentos')
+                    .where('id_trilha', '==', dados['id_trilha'])
+                    .where('data_agendada', '==', data_agendada).stream()
+                    if Agendamentos._status_ativo(doc.to_dict().get('status'))
+                )
+                if capacidade > 0 and ocupadas >= capacidade:
+                    return {"erro": "Não há vagas disponíveis para esta atividade."}, 409
+
             id_agendamento = str(uuid.uuid4())
             agendamento = {
                 "id": id_agendamento,
                 "id_usuario": dados.get("id_usuario"),
                 "id_trilha": dados.get("id_trilha"),
                 "id_guia": id_guia,
-                "data_agendada": dados.get("data_agendada"),
-                "valor_pago": dados.get("valor_pago"),
+                "data_agendada": data_agendada,
+                "valor_pago": dados_trilha.get('preco', 0),
                 "status": "agendado",
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
@@ -61,7 +140,8 @@ class Agendamentos:
     def listar_agendamentos_usuario(db, id_usuario):
         try:
             ref = db.collection('agendamentos').where('id_usuario', '==', id_usuario).stream()
-            lista = [doc.to_dict() for doc in ref]
+            usuarios, trilhas = {}, {}
+            lista = [Agendamentos._serializar(db, doc.to_dict(), usuarios, trilhas) for doc in ref]
             return lista, 200
         except Exception as e:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
@@ -87,9 +167,34 @@ class Agendamentos:
             for alias in Agendamentos._identificadores_guia(db, id_guia):
                 for doc in db.collection('agendamentos').where('id_guia', '==', alias).stream():
                     rows[doc.id] = doc.to_dict()
-            return list(rows.values()), 200
+            usuarios, trilhas = {}, {}
+            return [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()], 200
         except Exception as e:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
+
+    @staticmethod
+    def listar_agendamentos_agencia(db, usuario_atual):
+        try:
+            aliases = {usuario_atual.get('id'), usuario_atual.get('email')} - {None, ''}
+            agency_id = usuario_atual.get('id')
+            if agency_id and not usuario_atual.get('email'):
+                agency = db.collection('usuarios').document(agency_id).get()
+                if agency.exists:
+                    email = (agency.to_dict() or {}).get('email')
+                    if email:
+                        aliases.add(email)
+            trilhas_ids = set()
+            for alias in aliases:
+                for doc in db.collection('trilhas').where('criado_por', '==', alias).stream():
+                    trilhas_ids.add(doc.id)
+            rows = {}
+            for trilha_id in trilhas_ids:
+                for doc in db.collection('agendamentos').where('id_trilha', '==', trilha_id).stream():
+                    rows[doc.id] = doc.to_dict()
+            usuarios, trilhas = {}, {}
+            return [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()], 200
+        except Exception as e:
+            return {"erro": f"Erro ao buscar agendamentos da agência: {str(e)}"}, 500
 
     @staticmethod
     def cancelar_agendamento(db, id_agendamento, usuario_atual):
@@ -101,8 +206,14 @@ class Agendamentos:
                 return {"erro": "Agendamento não encontrado"}, 404
 
             dados = doc.to_dict()
-            if not Agendamentos._usuario_pode_gerenciar_agendamento(dados, usuario_atual):
+            if not Agendamentos._usuario_pode_gerenciar_agendamento(db, dados, usuario_atual):
                 return {"erro": "Acesso negado. Você não tem permissão para cancelar este agendamento."}, 403
+
+            status_atual = str(dados.get('status') or '').strip().lower()
+            if status_atual not in {'agendado', 'pendente', 'confirmado'}:
+                return {
+                    "erro": "Somente reservas ainda não iniciadas podem ser canceladas."
+                }, 409
 
             doc_ref.update({"status": "cancelado"})
 
@@ -141,7 +252,7 @@ class Agendamentos:
                 return {"erro": "Agendamento não encontrado"}, 404
 
             dados = doc.to_dict()
-            if not Agendamentos._usuario_pode_gerenciar_agendamento(dados, usuario_atual):
+            if not Agendamentos._usuario_pode_operar_agendamento(db, dados, usuario_atual):
                 return {"erro": "Acesso negado."}, 403
 
             if dados.get('status') != 'agendado':
@@ -169,7 +280,7 @@ class Agendamentos:
                 return {"erro": "Agendamento não encontrado"}, 404
 
             dados = doc.to_dict()
-            if not Agendamentos._usuario_pode_gerenciar_agendamento(dados, usuario_atual):
+            if not Agendamentos._usuario_pode_operar_agendamento(db, dados, usuario_atual):
                 return {"erro": "Acesso negado."}, 403
 
             if dados.get('status') != 'em_andamento':
@@ -188,15 +299,31 @@ class Agendamentos:
         from decimal import Decimal, InvalidOperation
         aliases = Agendamentos._identificadores_guia(db, id_guia)
         rows = {}
-        for alias in aliases:
-            for doc in db.collection('agendamentos').where('id_guia', '==', alias).stream():
-                rows[doc.id] = doc.to_dict()
-        counts = {key: 0 for key in ('agendado', 'em_andamento', 'concluido', 'cancelado', 'outros')}
+        user = db.collection('usuarios').document(id_guia).get()
+        role = (user.to_dict() or {}).get('tipo') if user.exists else None
+        if role == 'agencia':
+            trail_ids = set()
+            for alias in aliases:
+                for trail in db.collection('trilhas').where(
+                        'criado_por', '==', alias).stream():
+                    trail_ids.add(trail.id)
+            for trail_id in trail_ids:
+                for doc in db.collection('agendamentos').where(
+                        'id_trilha', '==', trail_id).stream():
+                    rows[doc.id] = doc.to_dict()
+        else:
+            for alias in aliases:
+                for doc in db.collection('agendamentos').where(
+                        'id_guia', '==', alias).stream():
+                    rows[doc.id] = doc.to_dict()
+        counts = {key: 0 for key in (
+            'pendente', 'agendado', 'confirmado', 'em_andamento',
+            'concluido', 'cancelado', 'outros')}
         amount = Decimal('0')
         for item in rows.values():
             status = item.get('status')
             counts[status if status in counts else 'outros'] += 1
-            if status not in ('agendado', 'em_andamento', 'concluido'):
+            if status not in Agendamentos.STATUS_ATIVOS | {'concluido'}:
                 continue
             try:
                 value = Decimal(str(item.get('valor_pago', 0)))

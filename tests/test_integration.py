@@ -13,7 +13,7 @@ from services.autenticacao import Autenticacao
 from services.trilhas import Trilhas
 from services.agendamentos import Agendamentos
 from services.usuarios import Usuarios
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 
 
@@ -42,6 +42,34 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/trilhas/', headers={'Authorization':'   '}).status_code, 401)
 
     @patch.dict(os.environ, {'KEY': 'test-key-only-' * 4})
+    def test_somente_turista_cria_reserva(self):
+        doc = MagicMock()
+        doc.exists = True
+        doc.id = 'u1'
+        with patch('services.autenticacao.firestore.client', return_value=self.db), patch(
+                'routes.agendamentos_routes.Agendamentos.agendar_trilha',
+                return_value=({'mensagem':'ok'},201)) as agendar:
+            self.db.collection.return_value.document.return_value.get.return_value = doc
+            for role in ('guia','agencia'):
+                doc.to_dict.return_value = {
+                    'id':'u1','email':f'{role}@example.test','tipo':role}
+                token = Autenticacao.make_token(
+                    f'{role}@example.test','u1',role)
+                response = self.client.post('/api/agendamentos/', json={
+                    'id_trilha':'t1','data_agendada':'2026-12-01'},
+                    headers={'Authorization':f'Bearer {token}'})
+                self.assertEqual(response.status_code,403)
+            doc.to_dict.return_value = {
+                'id':'u1','email':'turista@example.test','tipo':'usuario'}
+            token = Autenticacao.make_token(
+                'turista@example.test','u1','usuario')
+            response = self.client.post('/api/agendamentos/', json={
+                'id_trilha':'t1','data_agendada':'2026-12-01'},
+                headers={'Authorization':f'Bearer {token}'})
+            self.assertEqual(response.status_code,201)
+            agendar.assert_called_once()
+
+    @patch.dict(os.environ, {'KEY': 'test-key-only-' * 4})
     def test_login_usa_id_real_do_documento(self):
         doc = MagicMock()
         doc.id = 'u1'
@@ -53,6 +81,24 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(result['id'], 'u1')
         payload = jwt.decode(result['token'], os.environ['KEY'], algorithms=['HS256'])
         self.assertEqual(payload['id'], 'u1')
+
+    def test_alteracao_de_senha_confere_senha_atual(self):
+        ref = self.db.collection.return_value.document.return_value
+        ref.get.return_value.exists = True
+        ref.get.return_value.to_dict.return_value = {
+            'senha': generate_password_hash('senha123')}
+
+        self.assertEqual(Autenticacao.alterar_senha(
+            self.db,{'id':'u1'},
+            {'senha_atual':'incorreta','nova_senha':'nova123'})[1],401)
+        ref.update.assert_not_called()
+
+        result,status=Autenticacao.alterar_senha(
+            self.db,{'id':'u1'},
+            {'senha_atual':'senha123','nova_senha':'nova123'})
+        self.assertEqual(status,200,result)
+        nova_hash=ref.update.call_args.args[0]['senha']
+        self.assertTrue(check_password_hash(nova_hash,'nova123'))
 
     @patch.dict(os.environ, {'KEY': 'test-key-only-' * 4})
     def test_token_continua_valido_apos_troca_de_email(self):
@@ -75,6 +121,34 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(status, 201, result)
         saved = self.db.collection.return_value.document.return_value.set.call_args.args[0]
         self.assertEqual(saved['documento'], '52998224725')
+
+    def test_cadastro_valida_email_senha_e_documento_do_perfil(self):
+        base = {'nome':'Pessoa','senha':'senha123','tipo':'usuario'}
+        self.assertEqual(Usuarios.cadastrar_usuario(
+            self.db,{**base,'email':'invalido'})[1],400)
+        self.assertEqual(Usuarios.cadastrar_usuario(
+            self.db,{**base,'email':'pessoa@example.test','senha':'123'})[1],400)
+        self.assertEqual(Usuarios.cadastrar_usuario(self.db,{
+            **base,'email':'guia@example.test','tipo':'guia',
+            'documento':'11222333000181'})[1],400)
+        self.assertEqual(Usuarios.cadastrar_usuario(self.db,{
+            **base,'email':'agencia@example.test','tipo':'agencia',
+            'documento':'52998224725'})[1],400)
+
+    def test_login_nao_revela_conta_ausente_ou_inativa(self):
+        query = self.db.collection.return_value.where.return_value
+        query.stream.return_value = []
+        result,status=Autenticacao.login(
+            self.db,{'email':'ausente@example.test','senha':'senha123'})
+        self.assertEqual((result,status),({'erro':'Credenciais inválidas'},401))
+
+        doc=MagicMock()
+        doc.to_dict.return_value={'ativo':False,
+            'senha':generate_password_hash('senha123')}
+        query.stream.return_value=[doc]
+        result,status=Autenticacao.login(
+            self.db,{'email':'inativa@example.test','senha':'senha123'})
+        self.assertEqual((result,status),({'erro':'Credenciais inválidas'},401))
 
     def test_trilha_preserva_preco_e_id_do_guia(self):
         result, status = Trilhas.cadastrar_trilha(self.db, {

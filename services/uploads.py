@@ -3,9 +3,12 @@ import os
 from dotenv import load_dotenv
 
 # O override=True força o Python a ler as alterações mais recentes do seu arquivo .env
-load_dotenv(override=True)
+load_dotenv()
 
 class Uploads:
+    CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+    TAMANHO_MAXIMO = 5 * 1024 * 1024
+
     @staticmethod
     def enviar_para_imgbb(arquivo_imagem):
         try:
@@ -22,8 +25,17 @@ class Uploads:
                 "key": IMGBB_API_KEY.strip(),
             }
 
+            content_type = (arquivo_imagem.content_type or '').lower()
+            if content_type not in Uploads.CONTENT_TYPES:
+                return {"erro": "Envie uma imagem JPG, PNG ou WEBP"}, 400
+            conteudo = arquivo_imagem.read(Uploads.TAMANHO_MAXIMO + 1)
+            if not conteudo:
+                return {"erro": "A imagem está vazia"}, 400
+            if len(conteudo) > Uploads.TAMANHO_MAXIMO:
+                return {"erro": "A imagem deve ter no máximo 5 MB"}, 400
+
             arquivos = {
-                "image": (arquivo_imagem.filename, arquivo_imagem.read(), arquivo_imagem.content_type)
+                "image": (arquivo_imagem.filename, conteudo, content_type)
             }
 
             # Executa a requisição para a API do ImgBB

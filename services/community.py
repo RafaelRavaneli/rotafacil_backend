@@ -62,6 +62,24 @@ class Community:
                 if doc.to_dict().get('ativo', True)]
 
     @staticmethod
+    def guide(db, guide_id):
+        guide = required(db.collection('usuarios').document(guide_id))
+        data = guide.to_dict() or {}
+        if data.get('tipo') != 'guia' or not data.get('ativo', True):
+            raise CommunityError('Guia indisponível.', 404)
+        specialties = data.get('especialidades')
+        if not isinstance(specialties, list):
+            specialties = []
+        public = guide_public(guide)
+        public.update({
+            'descricao_profissional': str(
+                data.get('descricao_profissional') or '').strip(),
+            'especialidades': [str(item).strip() for item in specialties
+                               if str(item).strip()],
+        })
+        return public
+
+    @staticmethod
     def invite(db, user, data):
         if user.get('tipo') != 'agencia':
             raise CommunityError('Somente agências podem convidar guias.', 403)
@@ -98,6 +116,89 @@ class Community:
             raise CommunityError('Este convite já foi respondido.', 409)
         update_checked(ref, doc, {'status': status, 'respondido_em': now()})
         return {'id': ref.id, **invite, 'status': status}
+
+    @staticmethod
+    def manage_invitation(db, user, invitation_id, action):
+        ref = db.collection('convites_guias').document(invitation_id)
+        doc = required(ref)
+        invite = doc.to_dict()
+        action = (action or '').strip().lower()
+        is_agency = (user.get('tipo') == 'agencia' and
+                     invite.get('id_agencia') == user.get('id'))
+        is_guide = (user.get('tipo') == 'guia' and
+                    invite.get('id_guia') == user.get('id'))
+
+        if action == 'reenviar':
+            if not is_agency:
+                raise CommunityError('Somente a agência pode reenviar o convite.', 403)
+            if invite.get('status') not in {'recusado', 'revogado', 'desligado'}:
+                raise CommunityError('Este convite não pode ser reenviado agora.', 409)
+            guide = required(db.collection('usuarios').document(invite['id_guia']))
+            if guide.to_dict().get('tipo') != 'guia' or not guide.to_dict().get('ativo', True):
+                raise CommunityError('Guia indisponível.', 404)
+            values = {
+                'status': 'pendente',
+                'reenviado_em': now(),
+                'respondido_em': None,
+                'encerrado_em': None,
+            }
+        elif action == 'revogar':
+            if not is_agency:
+                raise CommunityError('Somente a agência pode revogar o convite.', 403)
+            if invite.get('status') != 'pendente':
+                raise CommunityError('Somente convites pendentes podem ser revogados.', 409)
+            values = {'status': 'revogado', 'encerrado_em': now()}
+        elif action == 'desligar':
+            if not (is_agency or is_guide):
+                raise CommunityError('Somente os participantes podem encerrar o vínculo.', 403)
+            if invite.get('status') != 'aceito':
+                raise CommunityError('Somente vínculos aceitos podem ser encerrados.', 409)
+            if Community._vinculo_tem_reservas_ativas(db, invite):
+                raise CommunityError(
+                    'Não é possível encerrar o vínculo enquanto houver reservas ativas.', 409)
+            Community._remover_guia_das_trilhas(db, invite)
+            values = {
+                'status': 'desligado',
+                'encerrado_em': now(),
+                'encerrado_por': user.get('id'),
+            }
+        else:
+            raise CommunityError('Ação de vínculo inválida.')
+
+        update_checked(ref, doc, values)
+        return {'id': ref.id, **invite, **values}
+
+    @staticmethod
+    def _aliases(db, user_id):
+        aliases = {user_id}
+        doc = db.collection('usuarios').document(user_id).get()
+        if doc.exists and (doc.to_dict() or {}).get('email'):
+            aliases.add(doc.to_dict()['email'])
+        return aliases
+
+    @staticmethod
+    def _trilhas_do_vinculo(db, invite):
+        agency_aliases = Community._aliases(db, invite['id_agencia'])
+        guide_aliases = Community._aliases(db, invite['id_guia'])
+        return [doc for doc in db.collection('trilhas').stream()
+                if (doc.to_dict() or {}).get('criado_por') in agency_aliases
+                and (doc.to_dict() or {}).get('id_guia') in guide_aliases]
+
+    @staticmethod
+    def _vinculo_tem_reservas_ativas(db, invite):
+        trail_ids = {doc.id for doc in Community._trilhas_do_vinculo(db, invite)}
+        for booking in db.collection('agendamentos').stream():
+            data = booking.to_dict() or {}
+            status = str(data.get('status') or '').strip().lower()
+            if (data.get('id_trilha') in trail_ids and status in {
+                    'agendado', 'pendente', 'confirmado', 'em_andamento'}):
+                return True
+        return False
+
+    @staticmethod
+    def _remover_guia_das_trilhas(db, invite):
+        for trail in Community._trilhas_do_vinculo(db, invite):
+            trail.reference.update({'id_guia': invite['id_agencia']})
 
     @staticmethod
     def linked(db, agency_id):

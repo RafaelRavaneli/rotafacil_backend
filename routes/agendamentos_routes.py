@@ -7,10 +7,10 @@ from services.autenticacao import token_obrigatorio, requer_papel, eh_dono_ou_te
 agendamentos_bp = Blueprint('agendamentos', __name__)
 
 # --- Criar um Agendamento ---
-# Apenas turistas (ou agências, se desejar) devem poder agendar
+# A criação de reserva pertence ao fluxo do turista.
 @agendamentos_bp.route('/', methods=['POST'])
 @token_obrigatorio
-@requer_papel('usuario', 'agencia', 'guia')
+@requer_papel('usuario')
 def agendar_trilha(usuario_atual):
     dados = request.get_json(silent=True) or {}
 
@@ -34,13 +34,23 @@ def listar_agendamentos_usuario(usuario_atual, id_usuario):
 # --- Listar Agendamentos do Guia ---
 @agendamentos_bp.route('/guia/<id_guia>', methods=['GET'])
 @token_obrigatorio
-@requer_papel('guia', 'agencia', 'admin')
+@requer_papel('guia', 'admin')
 def listar_agendamentos_guia(usuario_atual, id_guia):
     # Garante que o guia só veja a própria agenda
-    if not eh_dono_ou_tem_papel(usuario_atual, id_guia, 'admin', 'agencia'):
+    if not eh_dono_ou_tem_papel(usuario_atual, id_guia, 'admin'):
         return jsonify({"erro": "Acesso negado. Você só pode acessar sua própria agenda."}), 403
         
     resposta, status = Agendamentos.listar_agendamentos_guia(bd, id_guia)
+    return jsonify(resposta), status
+
+@agendamentos_bp.route('/agencia/<id_agencia>', methods=['GET'])
+@token_obrigatorio
+@requer_papel('agencia', 'admin')
+def listar_agendamentos_agencia(usuario_atual, id_agencia):
+    if not eh_dono_ou_tem_papel(usuario_atual, id_agencia, 'admin'):
+        return jsonify({"erro": "Acesso negado. Você só pode acessar as reservas da própria agência."}), 403
+    alvo = usuario_atual if usuario_atual.get('tipo') != 'admin' else {'id': id_agencia, 'tipo': 'agencia'}
+    resposta, status = Agendamentos.listar_agendamentos_agencia(bd, alvo)
     return jsonify(resposta), status
 
 # --- Cancelar Agendamento ---

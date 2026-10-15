@@ -1,11 +1,97 @@
 from services.community import Community
+from services.disponibilidades import Disponibilidades
 import uuid
 import math
+from datetime import date
 import pygeohash as pgh
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 class Trilhas:
+    CAMPOS_EDITAVEIS = {
+        'nome', 'descricao', 'dificuldade', 'modalidade', 'distancia_km',
+        'cidade', 'estado', 'data_atividade', 'latitude', 'longitude',
+        'imagem_url', 'acessivel', 'itens_recomendados', 'trajeto',
+        'id_guia', 'ativo', 'preco', 'capacidade', 'horario_inicio',
+        'horario_fim',
+    }
+
+    @staticmethod
+    def _validar_campos_publicos(dados, criacao=False):
+        proibidos = sorted(set(dados) - Trilhas.CAMPOS_EDITAVEIS)
+        if proibidos:
+            return f"Campos não permitidos: {', '.join(proibidos)}"
+        limites = {'nome': 160, 'descricao': 4000, 'dificuldade': 40,
+                   'modalidade': 80, 'cidade': 120, 'estado': 2}
+        for campo, limite in limites.items():
+            if campo not in dados:
+                continue
+            valor = dados.get(campo)
+            if not isinstance(valor, str) or not valor.strip() or len(valor.strip()) > limite:
+                return f"{campo} deve ser um texto de 1 a {limite} caracteres"
+            dados[campo] = valor.strip()
+        if criacao:
+            for campo in ('nome', 'descricao', 'dificuldade'):
+                if campo not in dados:
+                    return f"Campo obrigatório: {campo}"
+        if 'preco' in dados:
+            try:
+                preco = float(str(dados['preco']).strip().replace(',', '.'))
+            except (TypeError, ValueError):
+                return 'Preço deve ser um número válido'
+            if not math.isfinite(preco) or preco < 0:
+                return 'Preço deve ser um número maior ou igual a zero'
+            dados['preco'] = round(preco, 2)
+        for campo in ('ativo', 'acessivel'):
+            if campo in dados and not isinstance(dados[campo], bool):
+                return f"{campo} deve ser verdadeiro ou falso"
+        if dados.get('data_atividade'):
+            try:
+                data_atividade = date.fromisoformat(str(dados['data_atividade']))
+            except ValueError:
+                return 'data_atividade deve estar no formato AAAA-MM-DD'
+            if data_atividade < date.today():
+                return 'A data da atividade não pode estar no passado'
+        return None
+
+    @staticmethod
+    def _planejamento(dados, atual=None):
+        combinado = {**(atual or {}), **dados}
+        capacidade = combinado.get('capacidade', 12)
+        try:
+            capacidade = int(capacidade)
+        except (TypeError, ValueError) as exc:
+            raise ValueError('Capacidade deve ser um número inteiro.') from exc
+        if capacidade <= 0:
+            raise ValueError('Capacidade deve ser maior que zero.')
+        inicio = combinado.get('horario_inicio')
+        fim = combinado.get('horario_fim')
+        if bool(inicio) != bool(fim):
+            raise ValueError('Informe horário inicial e final.')
+        if inicio and fim:
+            inicio = Disponibilidades._hora(inicio, 'horario_inicio').strftime('%H:%M')
+            fim = Disponibilidades._hora(fim, 'horario_fim').strftime('%H:%M')
+            if inicio >= fim:
+                raise ValueError('O horário final deve ser posterior ao inicial.')
+        return capacidade, inicio, fim
+
+    @staticmethod
+    def _conflito_agenda(db, guia_id, data_texto, inicio, fim, ignorar=None):
+        if not guia_id or not data_texto or not inicio or not fim:
+            return False
+        if Disponibilidades.conflito_bloqueio(db, guia_id, data_texto, inicio, fim):
+            return True
+        for doc in db.collection('trilhas').where('id_guia', '==', guia_id).stream():
+            if doc.id == ignorar:
+                continue
+            item = doc.to_dict() or {}
+            if item.get('ativo') is False or item.get('data_atividade') != data_texto:
+                continue
+            if Disponibilidades._sobrepoe(
+                inicio, fim, item.get('horario_inicio', ''), item.get('horario_fim', '')):
+                return True
+        return False
+
     @staticmethod
     def _usuario_pode_gerenciar_trilha(dados_trilha, usuario_atual):
         """
@@ -44,9 +130,15 @@ class Trilhas:
                 user = db.collection('usuarios').document(identifier).get()
                 if not user.exists:
                     user = next(iter(db.collection('usuarios').where('email', '==', identifier).stream()), None)
-                public_name = (user.to_dict() or {}).get('nome') if user is not None and user.exists else None
-                cache[identifier] = public_name if isinstance(public_name, str) and public_name.strip() else None
-            data['nome_guia'] = cache[identifier]
+                user_data = (user.to_dict() or {}) if user is not None and user.exists else {}
+                public_name = user_data.get('nome')
+                cache[identifier] = {
+                    'nome': public_name if isinstance(public_name, str) and public_name.strip() else None,
+                    'tipo': user_data.get('tipo'),
+                }
+            responsible = cache[identifier]
+            data['nome_guia'] = responsible.get('nome')
+            data['tipo_responsavel'] = responsible.get('tipo')
         return data
 
     @staticmethod
@@ -114,10 +206,9 @@ class Trilhas:
             if not dados:
                 return {"erro": "Dados não enviados"}, 400
             
-            campos_obrigatorios = ["nome", "descricao", "dificuldade"]
-            for campo in campos_obrigatorios:
-                if campo not in dados:
-                    return {"erro": f"Campo obrigatório: {campo}"}, 400
+            erro_campos = Trilhas._validar_campos_publicos(dados, criacao=True)
+            if erro_campos:
+                return {"erro": erro_campos}, 400
 
             if 'distancia_km' in dados:
                 try:
@@ -148,11 +239,19 @@ class Trilhas:
                 return {"erro": f"Campo 'trajeto' inválido: {resultado}"}, 400
             trajeto = resultado
 
+            try:
+                capacidade, horario_inicio, horario_fim = Trilhas._planejamento(dados)
+            except ValueError as error:
+                return {'erro': str(error)}, 400
+
             id_trilha = str(uuid.uuid4())
             criado_por = usuario_atual.get("email") if isinstance(usuario_atual, dict) else usuario_atual 
             guia_responsavel = dados.get("id_guia") or usuario_atual.get("id")
             if not Community.can_assign(db, usuario_atual, guia_responsavel):
                 return {"erro": "O guia precisa aceitar o convite da agência antes de ser vinculado."}, 403
+            if Trilhas._conflito_agenda(
+                db, guia_responsavel, dados.get('data_atividade'), horario_inicio, horario_fim):
+                return {"erro": "O responsável já possui atividade ou bloqueio neste horário."}, 409
             trilha = {
                 "id": id_trilha,
                 "nome": dados.get("nome"),
@@ -174,6 +273,9 @@ class Trilhas:
                 "id_guia": guia_responsavel,
                 "ativo": bool(dados.get("ativo", True)),
                 "preco": dados.get("preco", 0),
+                "capacidade": capacidade,
+                "horario_inicio": horario_inicio,
+                "horario_fim": horario_fim,
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
 
@@ -225,6 +327,10 @@ class Trilhas:
             if not dados:
                 return {"erro": "Dados incompletos"}, 400
 
+            erro_campos = Trilhas._validar_campos_publicos(dados)
+            if erro_campos:
+                return {"erro": erro_campos}, 400
+
             if 'distancia_km' in dados:
                 try:
                     dados['distancia_km'] = Trilhas._distancia_valida(dados['distancia_km'])
@@ -257,12 +363,25 @@ class Trilhas:
             if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
                 return {"erro": "Acesso negado. Você não tem permissão para gerenciar esta trilha."}, 403
 
+            try:
+                capacidade, horario_inicio, horario_fim = Trilhas._planejamento(dados, doc.to_dict())
+            except ValueError as error:
+                return {'erro': str(error)}, 400
+            dados['capacidade'] = capacidade
+            dados['horario_inicio'] = horario_inicio
+            dados['horario_fim'] = horario_fim
+
             if dados.get('ativo') is False and Trilhas._tem_agendamentos_ativos(db, id_trilha):
                 return {'erro': 'Esta trilha possui reservas ativas. Cancele ou conclua essas reservas antes de desativá-la.'}, 409
 
             if 'id_guia' in dados and dados['id_guia'] != doc.to_dict().get('id_guia'):
                 if not isinstance(dados['id_guia'], str) or not Community.can_assign(db, usuario_atual, dados['id_guia']):
                     return {"erro": "Guia não vinculado à sua conta."}, 403
+            combinado = {**doc.to_dict(), **dados}
+            if Trilhas._conflito_agenda(
+                db, combinado.get('id_guia'), combinado.get('data_atividade'),
+                horario_inicio, horario_fim, ignorar=id_trilha):
+                return {"erro": "O responsável já possui atividade ou bloqueio neste horário."}, 409
             doc_ref.update(dados)
             return {"mensagem": "Trilha atualizada com sucesso!"}, 200
         except Exception as e:

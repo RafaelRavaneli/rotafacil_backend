@@ -45,6 +45,12 @@ class Avaliacoes:
             if nota < 1 or nota > 5:
                 return {"erro": "nota deve estar entre 1 e 5"}, 400
 
+            if comentario is None:
+                comentario = ''
+            if not isinstance(comentario, str) or len(comentario.strip()) > 500:
+                return {"erro": "comentario deve ser um texto de até 500 caracteres"}, 400
+            comentario = comentario.strip()
+
             trilha_ref = db.collection('trilhas').document(id_trilha).get()
             if not trilha_ref.exists:
                 return {"erro": "Trilha não encontrada"}, 404
