@@ -135,6 +135,57 @@ class CommunityTests(unittest.TestCase):
                 client.post('/api/usuarios/fcm-token/teste',json={'id_usuario':'x'},headers=headers('t'))
                 self.assertEqual(send.call_args.args[1],'t')
 
+    def test_agenda_por_id_inclui_email_legado_sem_outro_guia(self):
+        for booking_id, guide_id in [('nova','g'),('antiga','g@example.test'),('outra','outro')]:
+            self.db.collection('agendamentos').document(booking_id).set(
+                {'id':booking_id,'id_guia':guide_id,'status':'agendado'})
+        for identifier in ('g','g@example.test'):
+            result,status=Agendamentos.listar_agendamentos_guia(self.db,identifier)
+            self.assertEqual(status,200)
+            self.assertEqual({row['id'] for row in result},{'nova','antiga'})
+
+    @patch.dict(os.environ, {'KEY':'test-key-only-'*4})
+    def test_agenda_autorizada_somente_para_guia_dono(self):
+        self.db.collection('agendamentos').document('antiga').set(
+            {'id':'antiga','id_guia':'g@example.test','status':'agendado'})
+        client=app.test_client()
+        def headers(user):
+            return {'Authorization':'Bearer '+Autenticacao.make_token(user['email'],user['id'],user['tipo'])}
+        with patch('services.autenticacao.firestore.client',return_value=self.db), patch('routes.agendamentos_routes.bd',self.db):
+            for identifier in ('g','g@example.test'):
+                response=client.get('/api/agendamentos/guia/'+identifier,headers=headers(self.g))
+                self.assertEqual(response.status_code,200)
+                self.assertEqual([row['id'] for row in response.json],['antiga'])
+            for identifier in ('outro','outro@example.test'):
+                self.assertEqual(client.get('/api/agendamentos/guia/'+identifier,headers=headers(self.g)).status_code,403)
+            self.assertEqual(client.get('/api/agendamentos/guia/g',headers=headers(self.t)).status_code,403)
+            self.assertEqual(client.get('/api/agendamentos/guia/g').status_code,401)
+
+    def test_reservas_ativas_bloqueiam_delete_e_desativacao_por_edicao(self):
+        for status in ('agendado','pendente','em_andamento','Confirmado',''):
+            with self.subTest(status=status):
+                self.db.collection('trilhas').document('t1').set({'ativo':True,'id_guia':'g'})
+                self.db.collection('agendamentos').document('b1').set({'id':'b1','id_trilha':'t1','status':status})
+                self.assertEqual(Trilhas.deletar_trilha(self.db,'t1',self.g)[1],409)
+                self.assertEqual(Trilhas.atualizar_trilha(self.db,'t1',{'ativo':False},self.g)[1],409)
+                self.assertTrue(self.db.collection('trilhas').document('t1').get().to_dict()['ativo'])
+                self.assertTrue(self.db.collection('agendamentos').document('b1').get().exists)
+
+    def test_desativacao_preserva_historico_e_ignora_reservas_de_outra_trilha(self):
+        self.db.collection('trilhas').document('t1').set({'ativo':True,'id_guia':'g'})
+        for booking,status,trail in [('b1','cancelado','t1'),('b2','concluido','t1'),('b3','agendado','t2')]:
+            self.db.collection('agendamentos').document(booking).set({'id':booking,'id_trilha':trail,'status':status})
+        self.assertEqual(Trilhas.deletar_trilha(self.db,'t1',self.x)[1],403)
+        self.assertEqual(Trilhas.deletar_trilha(self.db,'t1',self.g)[1],200)
+        self.assertFalse(self.db.collection('trilhas').document('t1').get().to_dict()['ativo'])
+        self.assertEqual(len(self.db.collection('agendamentos').stream()),3)
+
+    def test_falha_ao_conferir_reservas_nao_desativa_trilha(self):
+        self.db.collection('trilhas').document('t1').set({'ativo':True,'id_guia':'g'})
+        with patch.object(Trilhas,'_tem_agendamentos_ativos',side_effect=RuntimeError('Offline')):
+            self.assertEqual(Trilhas.deletar_trilha(self.db,'t1',self.g)[1],500)
+        self.assertTrue(self.db.collection('trilhas').document('t1').get().to_dict()['ativo'])
+
     def test_rotas_de_chat_removidas(self):
         client = app.test_client()
         paths = ('/api/conversas', '/api/conversas/exemplo/mensagens',

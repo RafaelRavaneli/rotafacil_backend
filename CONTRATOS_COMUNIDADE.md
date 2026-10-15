@@ -36,3 +36,8 @@ Execute no backend `venv/Scripts/python.exe -m unittest discover -s tests -v`. O
 Homologue com contas de teste: convite e aceite, criacao de trilha com guia vinculado, rotacao e remocao de tokens, recebimento real de push e dashboard com reservas canceladas e referencias legadas.
 
 Esta alteracao remove implementacoes e contratos de mensagens. Nao executa exclusao de dados existentes no Firestore.
+
+
+## Desativação de trilhas com reservas
+
+DELETE /api/trilhas/<id> desativa a trilha e preserva documentos. Se houver reservas não encerradas, responde HTTP 409 e mantém a trilha ativa. A mesma regra vale para PUT com ativo=false. Apenas cancelamentos e conclusões liberam a desativação; registros históricos não são removidos. Falha na consulta impede a desativação e retorna erro.

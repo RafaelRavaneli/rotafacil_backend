@@ -67,11 +67,27 @@ class Agendamentos:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
 
     @staticmethod
+    def _identificadores_guia(db, id_guia):
+        """Resolve referências atuais e legadas sem depender de uma segunda chamada do cliente."""
+        aliases = {id_guia}
+        user = db.collection('usuarios').document(id_guia).get()
+        if user.exists:
+            email = (user.to_dict() or {}).get('email')
+            if email:
+                aliases.add(email)
+        else:
+            for doc in db.collection('usuarios').where('email', '==', id_guia).stream():
+                aliases.add(doc.id)
+        return aliases
+
+    @staticmethod
     def listar_agendamentos_guia(db, id_guia):
         try:
-            ref = db.collection('agendamentos').where('id_guia', '==', id_guia).stream()
-            lista = [doc.to_dict() for doc in ref]
-            return lista, 200
+            rows = {}
+            for alias in Agendamentos._identificadores_guia(db, id_guia):
+                for doc in db.collection('agendamentos').where('id_guia', '==', alias).stream():
+                    rows[doc.id] = doc.to_dict()
+            return list(rows.values()), 200
         except Exception as e:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
 
@@ -170,13 +186,7 @@ class Agendamentos:
     def dashboard_guia(db, id_guia):
         """Valores declarados nas reservas; não representam pagamentos conciliados."""
         from decimal import Decimal, InvalidOperation
-        aliases = {id_guia}
-        user = db.collection('usuarios').document(id_guia).get()
-        if user.exists and user.to_dict().get('email'):
-            aliases.add(user.to_dict()['email'])
-        elif not user.exists:
-            for doc in db.collection('usuarios').where('email', '==', id_guia).stream():
-                aliases.add(doc.id)
+        aliases = Agendamentos._identificadores_guia(db, id_guia)
         rows = {}
         for alias in aliases:
             for doc in db.collection('agendamentos').where('id_guia', '==', alias).stream():

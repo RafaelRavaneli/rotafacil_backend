@@ -26,6 +26,15 @@ class Trilhas:
         return eh_admin or eh_criador or eh_guia_responsavel
 
     @staticmethod
+    def _tem_agendamentos_ativos(db, id_trilha):
+        finais = {'cancelado', 'cancelada', 'cancelled', 'canceled', 'concluido', 'concluído', 'completed'}
+        for doc in db.collection('agendamentos').where('id_trilha', '==', id_trilha).stream():
+            status = str((doc.to_dict() or {}).get('status') or '').strip().lower()
+            if status not in finais:
+                return True
+        return False
+
+    @staticmethod
     def _calcular_distancia_km(lat1, lon1, lat2, lon2):
         """Distância em linha reta (Haversine) entre duas coordenadas, em km."""
         R = 6371
@@ -210,6 +219,9 @@ class Trilhas:
             if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
                 return {"erro": "Acesso negado. Você não tem permissão para gerenciar esta trilha."}, 403
 
+            if dados.get('ativo') is False and Trilhas._tem_agendamentos_ativos(db, id_trilha):
+                return {'erro': 'Esta trilha possui reservas ativas. Cancele ou conclua essas reservas antes de desativá-la.'}, 409
+
             if 'id_guia' in dados and dados['id_guia'] != doc.to_dict().get('id_guia'):
                 if not isinstance(dados['id_guia'], str) or not Community.can_assign(db, usuario_atual, dados['id_guia']):
                     return {"erro": "Guia não vinculado à sua conta."}, 403
@@ -309,6 +321,12 @@ class Trilhas:
             return {"erro": "Trilha não encontrada"}, 404
         if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
             return {"erro": "Você não tem permissão para excluir esta trilha."}, 403
+        try:
+            tem_reservas = Trilhas._tem_agendamentos_ativos(db, id_trilha)
+        except Exception:
+            return {'erro': 'Não foi possível verificar as reservas da trilha. Tente novamente.'}, 500
+        if tem_reservas:
+            return {'erro': 'Esta trilha possui reservas ativas. Cancele ou conclua essas reservas antes de desativá-la.'}, 409
         # Mantém referências de agendamentos já existentes.
         doc_ref.update({"ativo": False})
         return {"mensagem": "Trilha desativada com sucesso."}, 200
