@@ -14,20 +14,20 @@ class Favoritos:
 
             trilha_ref = db.collection('trilhas').document(id_trilha).get()
             if not trilha_ref.exists:
-                return {"erro": "Trilha não encontrada"}, 404
+                return {"erro": "Roteiro não encontrado"}, 404
 
             id_favorito = Favoritos._gerar_id_favorito(id_usuario, id_trilha)
             doc_ref = db.collection('favoritos').document(id_favorito)
 
             if doc_ref.get().exists:
-                return {"mensagem": "Essa trilha já está nos seus favoritos"}, 200
+                return {"mensagem": "Esse roteiro já está nos seus favoritos"}, 200
 
             doc_ref.set({
                 "id_usuario": id_usuario,
                 "id_trilha": id_trilha,
                 "createdAt": firestore.SERVER_TIMESTAMP
             })
-            return {"mensagem": "Trilha adicionada aos favoritos!"}, 201
+            return {"mensagem": "Roteiro adicionado aos favoritos!"}, 201
         except Exception as e:
             return {"erro": f"Erro ao adicionar favorito: {str(e)}"}, 500
 
@@ -38,10 +38,10 @@ class Favoritos:
             doc_ref = db.collection('favoritos').document(id_favorito)
 
             if not doc_ref.get().exists:
-                return {"erro": "Essa trilha não está nos seus favoritos"}, 404
+                return {"erro": "Esse roteiro não está nos seus favoritos"}, 404
 
             doc_ref.delete()
-            return {"mensagem": "Trilha removida dos favoritos"}, 200
+            return {"mensagem": "Roteiro removido dos favoritos"}, 200
         except Exception as e:
             return {"erro": f"Erro ao remover favorito: {str(e)}"}, 500
 

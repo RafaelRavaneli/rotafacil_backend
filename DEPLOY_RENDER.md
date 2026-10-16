@@ -31,7 +31,6 @@ Em Environment, configure:
 | CORS_ORIGINS | Origens autorizadas do frontend, separadas por virgula, sem barra final |
 | IMGBB_API_KEY | Chave privada para upload |
 | URL_IMGBB | `https://api.imgbb.com/1/upload` |
-| ORS_API_KEY | Chave privada do OpenRouteService |
 | EMAIL_REMETENTE | Conta Gmail para recuperacao de senha |
 | EMAIL_SENHA_APP | Senha de aplicativo da conta Gmail |
 | ENABLE_SCHEDULER | `false` |

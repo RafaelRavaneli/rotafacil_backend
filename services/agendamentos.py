@@ -76,11 +76,11 @@ class Agendamentos:
 
             trilha_ref = db.collection('trilhas').document(dados['id_trilha']).get()
             if not trilha_ref.exists:
-                return {"erro": "Trilha não encontrada. Verifique o id_trilha informado."}, 404
+                return {"erro": "Roteiro não encontrado. Verifique o id_trilha informado."}, 404
 
             dados_trilha = trilha_ref.to_dict()
             if dados_trilha.get('ativo') is False:
-                return {"erro": "Esta trilha não está disponível para agendamento."}, 409
+                return {"erro": "Este roteiro não está disponível para agendamento."}, 409
             id_guia = dados_trilha.get("id_guia")
 
             data_agendada = str(dados.get('data_agendada') or '').strip()
@@ -94,7 +94,7 @@ class Agendamentos:
                 .where('id_usuario', '==', dados['id_usuario']) \
                 .where('id_trilha', '==', dados['id_trilha']).stream()
             if any(Agendamentos._status_ativo(doc.to_dict().get('status')) for doc in existentes):
-                return {"erro": "Você já possui uma reserva ativa para esta trilha."}, 409
+                return {"erro": "Você já possui uma reserva ativa para este roteiro."}, 409
 
             capacidade = dados_trilha.get('capacidade')
             if capacidade is not None:
@@ -128,7 +128,7 @@ class Agendamentos:
             Notificacoes.notificar_usuario(
                 db, id_guia,
                 "Novo agendamento recebido!",
-                f"Você recebeu um novo agendamento para a trilha '{dados_trilha.get('nome')}'.",
+                f"Você recebeu um novo agendamento para o roteiro '{dados_trilha.get('nome')}'.",
                 dados={"tipo": "novo_agendamento", "id_agendamento": id_agendamento}
             )
 
@@ -222,20 +222,20 @@ class Agendamentos:
             id_guia_agendamento = dados.get('id_guia')
 
             trilha_doc = db.collection('trilhas').document(dados.get('id_trilha')).get()
-            nome_trilha = trilha_doc.to_dict().get('nome') if trilha_doc.exists else 'uma trilha'
+            nome_trilha = trilha_doc.to_dict().get('nome') if trilha_doc.exists else 'um roteiro'
 
             if quem_cancelou == id_usuario_agendamento:
                 Notificacoes.notificar_usuario(
                     db, id_guia_agendamento,
                     "Agendamento cancelado",
-                    f"Um participante cancelou o agendamento na trilha '{nome_trilha}'.",
+                    f"Um participante cancelou o agendamento no roteiro '{nome_trilha}'.",
                     dados={"tipo": "cancelamento", "id_agendamento": id_agendamento}
                 )
             else:
                 Notificacoes.notificar_usuario(
                     db, id_usuario_agendamento,
                     "Agendamento cancelado",
-                    f"Seu agendamento na trilha '{nome_trilha}' foi cancelado.",
+                    f"Seu agendamento no roteiro '{nome_trilha}' foi cancelado.",
                     dados={"tipo": "cancelamento", "id_agendamento": id_agendamento}
                 )
 
@@ -267,7 +267,7 @@ class Agendamentos:
                 atualizacao["checkin_longitude"] = longitude
 
             doc_ref.update(atualizacao)
-            return {"mensagem": "Check-in realizado! Boa trilha e cuidado no percurso."}, 200
+            return {"mensagem": "Check-in realizado! Bom roteiro e cuidado no percurso."}, 200
         except Exception as e:
             return {"erro": f"Erro ao fazer check-in: {str(e)}"}, 500
 
@@ -290,7 +290,7 @@ class Agendamentos:
                 "status": "concluido",
                 "checkout_at": firestore.SERVER_TIMESTAMP,
             })
-            return {"mensagem": "Check-out realizado! Trilha concluída com sucesso."}, 200
+            return {"mensagem": "Check-out realizado! Roteiro concluído com sucesso."}, 200
         except Exception as e:
             return {"erro": f"Erro ao fazer check-out: {str(e)}"}, 500
     @staticmethod

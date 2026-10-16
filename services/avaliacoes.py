@@ -53,16 +53,16 @@ class Avaliacoes:
 
             trilha_ref = db.collection('trilhas').document(id_trilha).get()
             if not trilha_ref.exists:
-                return {"erro": "Trilha não encontrada"}, 404
+                return {"erro": "Roteiro não encontrado"}, 404
 
             if not Avaliacoes._usuario_completou_trilha(db, id_usuario, id_trilha):
-                return {"erro": "Só é possível avaliar trilhas que você já concluiu (com check-out registrado)."}, 403
+                return {"erro": "Só é possível avaliar roteiros que você já concluiu (com check-out registrado)."}, 403
 
             id_avaliacao = Avaliacoes._gerar_id_avaliacao(id_usuario, id_trilha)
             doc_ref = db.collection('avaliacoes').document(id_avaliacao)
 
             if doc_ref.get().exists:
-                return {"erro": "Você já avaliou esta trilha"}, 409
+                return {"erro": "Você já avaliou este roteiro"}, 409
 
             doc_ref.set({
                 "id_usuario": id_usuario,

@@ -25,11 +25,11 @@ def enviar_lembretes_diarios(*, raise_errors=False):
 
             if data_agendamento == amanha:
                 trilha_doc = bd.collection('trilhas').document(dados.get('id_trilha')).get()
-                nome_trilha = trilha_doc.to_dict().get('nome') if trilha_doc.exists else 'sua trilha'
+                nome_trilha = trilha_doc.to_dict().get('nome') if trilha_doc.exists else 'seu roteiro'
                 Notificacoes.notificar_usuario(
                     bd, dados.get('id_usuario'),
-                    "Sua trilha é amanhã!",
-                    f"Não esqueça: '{nome_trilha}' está agendada para amanhã. Prepare sua mochila!",
+                    "Seu roteiro é amanhã!",
+                    f"Não esqueça: '{nome_trilha}' está agendado para amanhã. Prepare sua mochila!",
                     dados={"tipo": "lembrete", "id_agendamento": doc.id}
                 )
         print(f"[agendador] Lembretes diários verificados às {agora.isoformat()}.")

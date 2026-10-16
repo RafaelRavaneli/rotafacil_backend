@@ -601,7 +601,7 @@ class Usuarios:
                             tem_agendamento_ativo = True
                             break
                 if not tem_agendamento_ativo:
-                    return {"erro": "Você só pode ver o contato de emergência de participantes com agendamento ativo em suas trilhas."}, 403
+                    return {"erro": "Você só pode ver o contato de emergência de participantes com agendamento ativo em seus roteiros."}, 403
 
             return {
                 "nome_participante": dados_usuario.get("nome"),

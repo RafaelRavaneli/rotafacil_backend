@@ -17,14 +17,14 @@ class Clima:
         try:
             trilha_doc = db.collection('trilhas').document(id_trilha).get()
             if not trilha_doc.exists:
-                return {"erro": "Trilha não encontrada"}, 404
+                return {"erro": "Roteiro não encontrado"}, 404
 
             dados_trilha = trilha_doc.to_dict()
             latitude = dados_trilha.get('latitude')
             longitude = dados_trilha.get('longitude')
 
             if latitude is None or longitude is None:
-                return {"erro": "Esta trilha não possui coordenadas cadastradas. Não é possível obter previsão do tempo."}, 400
+                return {"erro": "Este roteiro não possui coordenadas cadastradas. Não é possível obter previsão do tempo."}, 400
 
             resposta = requests.get(
                 "https://api.open-meteo.com/v1/forecast",

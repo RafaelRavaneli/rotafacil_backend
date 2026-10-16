@@ -341,6 +341,33 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(Trilhas.atualizar_trilha(
             self.db,result['id'],{'criado_por':'outro'},self.g)[1],400)
 
+    def test_roteiro_aceita_varias_atividades_e_intervalo_em_dias_diferentes(self):
+        dados={
+            'nome':'Expedição','descricao':'Percurso completo',
+            'dificuldade':'Avançado','atividades':['Trilha','Rapel','Acampamento'],
+            'data_atividade':'2099-06-10','data_fim':'2099-06-11',
+            'data_hora_inicio':'2099-06-10T23:00:00',
+            'data_hora_fim':'2099-06-11T15:00:00',
+        }
+        result,status=Trilhas.cadastrar_trilha(self.db,dados,self.g)
+        self.assertEqual(status,201,result)
+        roteiro=self.db.collection('trilhas').document(result['id']).get().to_dict()
+        self.assertEqual(roteiro['atividades'],['Trilha','Rapel','Acampamento'])
+        self.assertEqual(roteiro['data_atividade'],'2099-06-10')
+        self.assertEqual(roteiro['data_fim'],'2099-06-11')
+        self.assertEqual(roteiro['horario_inicio'],'23:00')
+        self.assertEqual(roteiro['horario_fim'],'15:00')
+        invalido={**dados,'data_hora_fim':'2099-06-10T22:00:00'}
+        self.assertEqual(Trilhas.cadastrar_trilha(self.db,invalido,self.g)[1],400)
+        Disponibilidades.criar(self.db,self.g,{
+            'data':'2099-07-11','horario_inicio':'10:00',
+            'horario_fim':'16:00','tipo':'bloqueio'})
+        conflito={
+            **dados,'data_atividade':'2099-07-10','data_fim':'2099-07-11',
+            'data_hora_inicio':'2099-07-10T23:00:00',
+            'data_hora_fim':'2099-07-11T15:00:00'}
+        self.assertEqual(Trilhas.cadastrar_trilha(self.db,conflito,self.g)[1],409)
+
     def test_reserva_usa_preco_do_servidor_bloqueia_duplicidade_e_lotacao(self):
         self.db.collection('trilhas').document('t1').set({
             'nome':'Trilha final','ativo':True,'id_guia':'g',

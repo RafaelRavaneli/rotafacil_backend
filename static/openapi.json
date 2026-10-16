@@ -1810,137 +1810,6 @@
         }
       }
     },
-    "/api/trilhas/{id_trilha}/rota-ate-destino": {
-      "get": {
-        "tags": [
-          "Trilhas"
-        ],
-        "summary": "Calcular rota ate inicio da trilha",
-        "operationId": "get_api_trilhas_id_trilha_rota_ate_destino",
-        "description": "Latitude e longitude da origem sao obrigatorias. Requer coordenadas da trilha e ORS_API_KEY no servidor.",
-        "parameters": [
-          {
-            "name": "id_trilha",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "example": "ID_REAL_DO_REGISTRO"
-            }
-          },
-          {
-            "name": "latitude",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "number",
-              "example": -23.42
-            }
-          },
-          {
-            "name": "longitude",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "number",
-              "example": -51.93
-            }
-          },
-          {
-            "name": "perfil",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "driving-car",
-              "enum": [
-                "driving-car",
-                "driving-hgv",
-                "cycling-regular",
-                "cycling-road",
-                "cycling-mountain",
-                "cycling-electric",
-                "foot-walking",
-                "foot-hiking",
-                "wheelchair"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Operacao realizada.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rota"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Dados invalidos ou obrigatorios ausentes.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "JWT ausente, invalido ou expirado; no login, credenciais invalidas.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Permissao insuficiente.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Registro nao encontrado.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Erro interno do servidor.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Falha no servico externo.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/agendamentos/": {
       "post": {
         "tags": [
@@ -3663,11 +3532,19 @@
           },
           "dificuldade": {
             "type": "string",
-            "example": "Facil"
+            "enum": ["Iniciante", "Intermediário", "Avançado"],
+            "example": "Intermediário"
           },
           "modalidade": {
             "type": "string",
-            "default": "Trekking"
+            "description": "Campo legado. Novos clientes devem usar atividades.",
+            "default": "Trilha"
+          },
+          "atividades": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string"},
+            "example": ["Trilha", "Rapel", "Acampamento"]
           },
           "distancia_km": {
             "type": "number",
@@ -3685,6 +3562,21 @@
             "type": "string",
             "format": "date",
             "example": "2026-10-20"
+          },
+          "data_fim": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-10-21"
+          },
+          "data_hora_inicio": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-20T23:00:00"
+          },
+          "data_hora_fim": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-21T15:00:00"
           },
           "latitude": {
             "type": "number",
@@ -3728,6 +3620,11 @@
           "preco": {
             "type": "number",
             "example": 50
+          },
+          "capacidade": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 12
           }
         }
       },
@@ -4119,26 +4016,6 @@
           }
         }
       },
-      "Rota": {
-        "type": "object",
-        "properties": {
-          "distancia_km": {
-            "type": "number"
-          },
-          "duracao_minutos": {
-            "type": "number"
-          },
-          "perfil": {
-            "type": "string"
-          },
-          "trajeto": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Ponto"
-            }
-          }
-        }
-      },
       "TrilhaNova": {
         "type": "object",
         "properties": {
@@ -4224,7 +4101,7 @@
           "descricao",
           "dificuldade"
         ],
-        "description": "Se informar uma coordenada inicial, informe latitude e longitude juntas."
+        "description": "Novos clientes devem enviar atividades e o intervalo completo em data_hora_inicio e data_hora_fim. Se informar uma coordenada, informe latitude e longitude juntas."
       },
       "Trilha": {
         "type": "object",
@@ -4239,11 +4116,17 @@
           },
           "dificuldade": {
             "type": "string",
-            "example": "Facil"
+            "enum": ["Iniciante", "Intermediário", "Avançado"],
+            "example": "Intermediário"
           },
           "modalidade": {
             "type": "string",
-            "default": "Trekking"
+            "description": "Campo legado. Novos clientes devem usar atividades.",
+            "default": "Trilha"
+          },
+          "atividades": {
+            "type": "array",
+            "items": {"type": "string"}
           },
           "distancia_km": {
             "type": "number",
@@ -4259,6 +4142,20 @@
           },
           "data_atividade": {
             "type": "string",
+            "nullable": true
+          },
+          "data_fim": {
+            "type": "string",
+            "nullable": true
+          },
+          "data_hora_inicio": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "data_hora_fim": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
           "latitude": {
@@ -4300,6 +4197,10 @@
           "preco": {
             "type": "number",
             "example": 50
+          },
+          "capacidade": {
+            "type": "integer",
+            "minimum": 1
           },
           "id": {
             "type": "string"

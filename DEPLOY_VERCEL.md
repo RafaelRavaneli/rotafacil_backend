@@ -23,7 +23,6 @@ Preparação para testes do grupo. A publicação só está concluída quando o 
 | `FIREBASE_STORAGE_BUCKET` | Bucket privado usado para documentos profissionais |
 | `EMAIL_REMETENTE` | Conta utilizada na recuperação de senha |
 | `EMAIL_SENHA_APP` | Senha de aplicativo do e-mail; validar SMTP na hospedagem |
-| `ORS_API_KEY` | Manter somente se o serviço de rotas existente for utilizado |
 | `ENABLE_SCHEDULER` | `false` |
 | `FLASK_DEBUG` | `false` |
 

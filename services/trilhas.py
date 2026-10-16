@@ -2,7 +2,7 @@ from services.community import Community
 from services.disponibilidades import Disponibilidades
 import uuid
 import math
-from datetime import date
+from datetime import date, datetime
 import pygeohash as pgh
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -13,7 +13,8 @@ class Trilhas:
         'cidade', 'estado', 'data_atividade', 'latitude', 'longitude',
         'imagem_url', 'acessivel', 'itens_recomendados', 'trajeto',
         'id_guia', 'ativo', 'preco', 'capacidade', 'horario_inicio',
-        'horario_fim',
+        'horario_fim', 'data_fim', 'data_hora_inicio', 'data_hora_fim',
+        'atividades',
     }
 
     @staticmethod
@@ -52,6 +53,25 @@ class Trilhas:
                 return 'data_atividade deve estar no formato AAAA-MM-DD'
             if data_atividade < date.today():
                 return 'A data da atividade não pode estar no passado'
+        if 'dificuldade' in dados:
+            dificuldades = {
+                'fácil': 'Iniciante', 'facil': 'Iniciante',
+                'iniciante': 'Iniciante', 'moderada': 'Intermediário',
+                'moderado': 'Intermediário', 'intermediário': 'Intermediário',
+                'intermediario': 'Intermediário', 'difícil': 'Avançado',
+                'dificil': 'Avançado', 'avançado': 'Avançado',
+                'avancado': 'Avançado',
+            }
+            dificuldade = dificuldades.get(dados['dificuldade'].lower())
+            if dificuldade is None:
+                return 'dificuldade deve ser Iniciante, Intermediário ou Avançado'
+            dados['dificuldade'] = dificuldade
+        if 'atividades' in dados:
+            atividades = dados['atividades']
+            if (not isinstance(atividades, list) or not atividades or len(atividades) > 50 or
+                    not all(isinstance(item, str) and 0 < len(item.strip()) <= 80 for item in atividades)):
+                return 'atividades deve ser uma lista não vazia de textos'
+            dados['atividades'] = list(dict.fromkeys(item.strip() for item in atividades))
         return None
 
     @staticmethod
@@ -64,31 +84,84 @@ class Trilhas:
             raise ValueError('Capacidade deve ser um número inteiro.') from exc
         if capacidade <= 0:
             raise ValueError('Capacidade deve ser maior que zero.')
-        inicio = combinado.get('horario_inicio')
-        fim = combinado.get('horario_fim')
-        if bool(inicio) != bool(fim):
-            raise ValueError('Informe horário inicial e final.')
-        if inicio and fim:
-            inicio = Disponibilidades._hora(inicio, 'horario_inicio').strftime('%H:%M')
-            fim = Disponibilidades._hora(fim, 'horario_fim').strftime('%H:%M')
-            if inicio >= fim:
-                raise ValueError('O horário final deve ser posterior ao inicial.')
-        return capacidade, inicio, fim
+        inicio_iso = combinado.get('data_hora_inicio')
+        fim_iso = combinado.get('data_hora_fim')
+        if bool(inicio_iso) != bool(fim_iso):
+            raise ValueError('Informe data e hora de início e fim do roteiro.')
+        if inicio_iso and fim_iso:
+            try:
+                inicio_dt = datetime.fromisoformat(str(inicio_iso).replace('Z', '+00:00'))
+                fim_dt = datetime.fromisoformat(str(fim_iso).replace('Z', '+00:00'))
+            except ValueError as exc:
+                raise ValueError('Data e hora do roteiro devem estar no formato ISO 8601.') from exc
+            if inicio_dt.tzinfo is not None:
+                inicio_dt = inicio_dt.replace(tzinfo=None)
+            if fim_dt.tzinfo is not None:
+                fim_dt = fim_dt.replace(tzinfo=None)
+        else:
+            data_inicio = combinado.get('data_atividade')
+            data_fim = combinado.get('data_fim') or data_inicio
+            inicio = combinado.get('horario_inicio')
+            fim = combinado.get('horario_fim')
+            if not any((data_inicio, inicio, fim)):
+                return capacidade, None, None, None, None
+            if not data_inicio or not inicio or not fim:
+                raise ValueError('Informe data e hora de início e fim do roteiro.')
+            try:
+                inicio_dt = datetime.fromisoformat(
+                    f"{data_inicio}T{Disponibilidades._hora(inicio, 'horario_inicio').strftime('%H:%M')}"
+                )
+                fim_dt = datetime.fromisoformat(
+                    f"{data_fim}T{Disponibilidades._hora(fim, 'horario_fim').strftime('%H:%M')}"
+                )
+            except ValueError as exc:
+                raise ValueError('Data e hora do roteiro são inválidas.') from exc
+        if fim_dt <= inicio_dt:
+            raise ValueError('O fim do roteiro deve ser posterior ao início.')
+        inicio_iso = inicio_dt.isoformat(timespec='minutes')
+        fim_iso = fim_dt.isoformat(timespec='minutes')
+        return (
+            capacidade,
+            inicio_dt.strftime('%H:%M'),
+            fim_dt.strftime('%H:%M'),
+            inicio_iso,
+            fim_iso,
+        )
 
     @staticmethod
-    def _conflito_agenda(db, guia_id, data_texto, inicio, fim, ignorar=None):
-        if not guia_id or not data_texto or not inicio or not fim:
+    def _conflito_agenda(db, guia_id, inicio_iso, fim_iso, ignorar=None):
+        if not guia_id or not inicio_iso or not fim_iso:
             return False
-        if Disponibilidades.conflito_bloqueio(db, guia_id, data_texto, inicio, fim):
-            return True
+        inicio_dt = datetime.fromisoformat(inicio_iso)
+        fim_dt = datetime.fromisoformat(fim_iso)
+        dia = inicio_dt.date()
+        while dia <= fim_dt.date():
+            inicio_dia = inicio_dt.strftime('%H:%M') if dia == inicio_dt.date() else '00:00'
+            fim_dia = fim_dt.strftime('%H:%M') if dia == fim_dt.date() else '23:59'
+            if Disponibilidades.conflito_bloqueio(
+                    db, guia_id, dia.isoformat(), inicio_dia, fim_dia):
+                return True
+            dia = date.fromordinal(dia.toordinal() + 1)
         for doc in db.collection('trilhas').where('id_guia', '==', guia_id).stream():
             if doc.id == ignorar:
                 continue
             item = doc.to_dict() or {}
-            if item.get('ativo') is False or item.get('data_atividade') != data_texto:
+            if item.get('ativo') is False:
                 continue
-            if Disponibilidades._sobrepoe(
-                inicio, fim, item.get('horario_inicio', ''), item.get('horario_fim', '')):
+            try:
+                outro_inicio = datetime.fromisoformat(item.get('data_hora_inicio'))
+                outro_fim = datetime.fromisoformat(item.get('data_hora_fim'))
+            except (TypeError, ValueError):
+                outra_data = item.get('data_atividade')
+                if not outra_data:
+                    continue
+                outro_inicio = datetime.fromisoformat(
+                    f"{outra_data}T{item.get('horario_inicio', '00:00')}"
+                )
+                outro_fim = datetime.fromisoformat(
+                    f"{item.get('data_fim') or outra_data}T{item.get('horario_fim', '23:59')}"
+                )
+            if inicio_dt < outro_fim and fim_dt > outro_inicio:
                 return True
         return False
 
@@ -240,7 +313,8 @@ class Trilhas:
             trajeto = resultado
 
             try:
-                capacidade, horario_inicio, horario_fim = Trilhas._planejamento(dados)
+                (capacidade, horario_inicio, horario_fim,
+                 data_hora_inicio, data_hora_fim) = Trilhas._planejamento(dados)
             except ValueError as error:
                 return {'erro': str(error)}, 400
 
@@ -250,7 +324,7 @@ class Trilhas:
             if not Community.can_assign(db, usuario_atual, guia_responsavel):
                 return {"erro": "O guia precisa aceitar o convite da agência antes de ser vinculado."}, 403
             if Trilhas._conflito_agenda(
-                db, guia_responsavel, dados.get('data_atividade'), horario_inicio, horario_fim):
+                db, guia_responsavel, data_hora_inicio, data_hora_fim):
                 return {"erro": "O responsável já possui atividade ou bloqueio neste horário."}, 409
             trilha = {
                 "id": id_trilha,
@@ -258,10 +332,14 @@ class Trilhas:
                 "descricao": dados.get("descricao"),
                 "dificuldade": dados.get("dificuldade"),
                 "modalidade": dados.get("modalidade", "Trekking"),
+                "atividades": dados.get("atividades") or [dados.get("modalidade", "Trilha")],
                 "distancia_km": dados.get("distancia_km", 0.0),
                 "cidade": dados.get("cidade"),
                 "estado": dados.get("estado"),
                 "data_atividade": dados.get("data_atividade"),
+                "data_fim": dados.get("data_fim") or (data_hora_fim[:10] if data_hora_fim else None),
+                "data_hora_inicio": data_hora_inicio,
+                "data_hora_fim": data_hora_fim,
                 "latitude": latitude,
                 "longitude": longitude,
                 "geohash": geohash,
@@ -280,7 +358,7 @@ class Trilhas:
             }
 
             db.collection('trilhas').document(id_trilha).set(trilha)
-            return {"mensagem": "Trilha cadastrada com sucesso!", "id": id_trilha}, 201
+            return {"mensagem": "Roteiro cadastrado com sucesso!", "id": id_trilha}, 201
         except Exception as e:
             return {"erro": f"Erro interno: {str(e)}"}, 500
         
@@ -292,7 +370,7 @@ class Trilhas:
             trilhas = [Trilhas._serializar_trilha(db, doc, responsaveis) for doc in trilhas_ref]
             return trilhas, 200
         except Exception as e:
-            return {"erro": f"Erro ao buscar trilhas: {str(e)}"}, 500
+            return {"erro": f"Erro ao buscar roteiros: {str(e)}"}, 500
     
     @staticmethod
     def buscar_trilha_por_id(db, id_trilha):
@@ -300,9 +378,9 @@ class Trilhas:
             doc_ref = db.collection('trilhas').document(id_trilha).get()
             if doc_ref.exists:
                 return Trilhas._serializar_trilha(db, doc_ref), 200
-            return {"erro": "Trilha não encontrada"}, 404
+            return {"erro": "Roteiro não encontrado"}, 404
         except Exception as e:
-            return {"erro": f"Erro ao buscar trilha: {str(e)}"}, 500
+            return {"erro": f"Erro ao buscar roteiro: {str(e)}"}, 500
 
     @staticmethod
     def listar_trilhas_por_data(db, data_inicio, data_fim):
@@ -317,7 +395,7 @@ class Trilhas:
             
             if trilhas:
                 return trilhas, 200
-            return {"mensagem": "Nenhuma trilha encontrada nesse período"}, 404
+            return {"mensagem": "Nenhum roteiro encontrado nesse período"}, 404
         except Exception as e:
             return {"erro": f"Ocorreu um erro na busca por data: {str(e)}"}, 500
         
@@ -358,34 +436,40 @@ class Trilhas:
             doc_ref = db.collection('trilhas').document(id_trilha)
             doc = doc_ref.get()
             if not doc.exists:
-                return {"erro": "Trilha não encontrada"}, 404
+                return {"erro": "Roteiro não encontrado"}, 404
 
             if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
-                return {"erro": "Acesso negado. Você não tem permissão para gerenciar esta trilha."}, 403
+                return {"erro": "Acesso negado. Você não tem permissão para gerenciar este roteiro."}, 403
 
             try:
-                capacidade, horario_inicio, horario_fim = Trilhas._planejamento(dados, doc.to_dict())
+                (capacidade, horario_inicio, horario_fim,
+                 data_hora_inicio, data_hora_fim) = Trilhas._planejamento(dados, doc.to_dict())
             except ValueError as error:
                 return {'erro': str(error)}, 400
             dados['capacidade'] = capacidade
             dados['horario_inicio'] = horario_inicio
             dados['horario_fim'] = horario_fim
+            dados['data_hora_inicio'] = data_hora_inicio
+            dados['data_hora_fim'] = data_hora_fim
+            if data_hora_inicio and data_hora_fim:
+                dados['data_atividade'] = data_hora_inicio[:10]
+                dados['data_fim'] = data_hora_fim[:10]
 
             if dados.get('ativo') is False and Trilhas._tem_agendamentos_ativos(db, id_trilha):
-                return {'erro': 'Esta trilha possui reservas ativas. Cancele ou conclua essas reservas antes de desativá-la.'}, 409
+                return {'erro': 'Este roteiro possui reservas ativas. Cancele ou conclua essas reservas antes de desativá-lo.'}, 409
 
             if 'id_guia' in dados and dados['id_guia'] != doc.to_dict().get('id_guia'):
                 if not isinstance(dados['id_guia'], str) or not Community.can_assign(db, usuario_atual, dados['id_guia']):
                     return {"erro": "Guia não vinculado à sua conta."}, 403
             combinado = {**doc.to_dict(), **dados}
             if Trilhas._conflito_agenda(
-                db, combinado.get('id_guia'), combinado.get('data_atividade'),
-                horario_inicio, horario_fim, ignorar=id_trilha):
+                db, combinado.get('id_guia'), data_hora_inicio,
+                data_hora_fim, ignorar=id_trilha):
                 return {"erro": "O responsável já possui atividade ou bloqueio neste horário."}, 409
             doc_ref.update(dados)
-            return {"mensagem": "Trilha atualizada com sucesso!"}, 200
+            return {"mensagem": "Roteiro atualizado com sucesso!"}, 200
         except Exception as e:
-            return {"erro": f"Erro ao atualizar trilha: {str(e)}"}, 500
+            return {"erro": f"Erro ao atualizar roteiro: {str(e)}"}, 500
              
     #busca avançada com filtros dinâmicos  
     @staticmethod
@@ -465,7 +549,7 @@ class Trilhas:
                 lista_trilhas = trilhas_no_raio
 
             if not lista_trilhas:
-                return {"mensagem": "Nenhuma trilha encontrada com esses filtros."}, 404
+                return {"mensagem": "Nenhum roteiro encontrado com esses filtros."}, 404
 
             return lista_trilhas, 200
 
@@ -476,15 +560,15 @@ class Trilhas:
         doc_ref = db.collection('trilhas').document(id_trilha)
         doc = doc_ref.get()
         if not doc.exists:
-            return {"erro": "Trilha não encontrada"}, 404
+            return {"erro": "Roteiro não encontrado"}, 404
         if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
-            return {"erro": "Você não tem permissão para excluir esta trilha."}, 403
+            return {"erro": "Você não tem permissão para excluir este roteiro."}, 403
         try:
             tem_reservas = Trilhas._tem_agendamentos_ativos(db, id_trilha)
         except Exception:
-            return {'erro': 'Não foi possível verificar as reservas da trilha. Tente novamente.'}, 500
+            return {'erro': 'Não foi possível verificar as reservas do roteiro. Tente novamente.'}, 500
         if tem_reservas:
-            return {'erro': 'Esta trilha possui reservas ativas. Cancele ou conclua essas reservas antes de desativá-la.'}, 409
+            return {'erro': 'Este roteiro possui reservas ativas. Cancele ou conclua essas reservas antes de desativá-lo.'}, 409
         # Mantém referências de agendamentos já existentes.
         doc_ref.update({"ativo": False})
-        return {"mensagem": "Trilha desativada com sucesso."}, 200
+        return {"mensagem": "Roteiro desativado com sucesso."}, 200
