@@ -169,7 +169,9 @@ class Trilhas:
     def _usuario_pode_gerenciar_trilha(dados_trilha, usuario_atual):
         """
         Regra compartilhada entre atualizar e deletar trilha:
-        só o criador, o guia responsável, ou um admin podem mexer.
+        só o criador ou um admin podem mexer. O guia responsável executa o
+        roteiro, mas não recebe propriedade sobre um roteiro da agência.
+        Registros legados sem criador continuam sob gestão do guia indicado.
         """
         criador = dados_trilha.get('criado_por')
         guia = dados_trilha.get('id_guia')
@@ -182,7 +184,9 @@ class Trilhas:
         eh_criador = email_usuario == criador or id_usuario == criador
         eh_guia_responsavel = email_usuario == guia or id_usuario == guia
 
-        return eh_admin or eh_criador or eh_guia_responsavel
+        eh_responsavel_legado = not criador and eh_guia_responsavel
+
+        return eh_admin or eh_criador or eh_responsavel_legado
 
     @staticmethod
     def _distancia_valida(value):

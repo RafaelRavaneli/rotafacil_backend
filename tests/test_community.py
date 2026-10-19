@@ -133,7 +133,18 @@ class CommunityTests(unittest.TestCase):
         self.denied(403,Community.answer_invitation,self.db,self.a,invite['id'],{'status':'aceito'})
         Community.answer_invitation(self.db,self.g,invite['id'],{'status':'aceito'})
         self.assertTrue(Community.can_assign(self.db,self.a,'g'))
-        self.assertEqual(Trilhas.cadastrar_trilha(self.db,data,self.a)[1],201)
+        result,status=Trilhas.cadastrar_trilha(self.db,data,self.a)
+        self.assertEqual(status,201)
+        self.assertEqual(
+            Trilhas.atualizar_trilha(
+                self.db,result['id'],{'descricao':'Sem autorização'},self.g
+            )[1],403)
+        self.assertEqual(
+            Trilhas.deletar_trilha(self.db,result['id'],self.g)[1],403)
+        self.assertEqual(
+            Trilhas.atualizar_trilha(
+                self.db,result['id'],{'descricao':'Atualizado pela agência'},self.a
+            )[1],200)
         self.denied(409,Community.answer_invitation,self.db,self.g,invite['id'],{'status':'recusado'})
         self.denied(409,Community.invite,self.db,self.a,{'id_guia':'g'})
 
