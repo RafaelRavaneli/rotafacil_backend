@@ -473,6 +473,7 @@ class CommunityTests(unittest.TestCase):
         reservas,status=Agendamentos.listar_agendamentos_agencia(self.db,self.a)
         self.assertEqual(status,200,reservas)
         self.assertEqual(reservas[0]['telefone_agencia'],'44988880000')
+        self.assertIsNone(reservas[0]['telefone_guia'])
         self.assertEqual(reservas[0]['id_agencia'],'a')
         with patch('services.agendamentos.Notificacoes.notificar_usuario') as notify:
             result,status=Agendamentos.agendar_trilha(self.db,{

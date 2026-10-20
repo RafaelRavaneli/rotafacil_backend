@@ -52,6 +52,7 @@ class Agendamentos:
             item['id_agencia'] = agencia_id
             item['nome_agencia'] = agencia.get('nome')
             item['telefone_agencia'] = agencia.get('telefone')
+            item['telefone_guia'] = None
         item['avaliado'] = bool(item.get('id') and db.collection(
             'avaliacoes').document(str(item.get('id'))).get().exists)
         for campo in ('createdAt', 'cancelado_em'):
