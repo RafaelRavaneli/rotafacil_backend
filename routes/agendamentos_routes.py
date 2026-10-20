@@ -1,3 +1,5 @@
+import os
+
 from flask import Blueprint, request, jsonify
 from models.database import bd
 from services.agendamentos import Agendamentos
@@ -5,6 +7,12 @@ from services.autenticacao import token_obrigatorio, requer_papel, eh_dono_ou_te
 
 # Inicializa o Blueprint
 agendamentos_bp = Blueprint('agendamentos', __name__)
+
+
+def _checkin_checkout_ativo():
+    return os.getenv('ENABLE_CHECKIN_CHECKOUT', 'false').strip().lower() in {
+        '1', 'true', 'yes'
+    }
 
 # --- Criar um Agendamento ---
 # A criação de reserva pertence ao fluxo do turista.
@@ -74,6 +82,10 @@ def dashboard_guia(usuario_atual, id_guia):
 @agendamentos_bp.route('/<id_agendamento>/checkin', methods=['PUT'])
 @token_obrigatorio
 def checkin_agendamento(usuario_atual, id_agendamento):
+    if not _checkin_checkout_ativo():
+        return jsonify({
+            "erro": "Check-in e check-out estão temporariamente indisponíveis."
+        }), 503
     dados = request.get_json(silent=True) or {}
     resposta, status = Agendamentos.fazer_checkin(
         bd, id_agendamento, usuario_atual, dados.get('latitude'), dados.get('longitude')
@@ -84,6 +96,10 @@ def checkin_agendamento(usuario_atual, id_agendamento):
 @agendamentos_bp.route('/<id_agendamento>/checkout', methods=['PUT'])
 @token_obrigatorio
 def checkout_agendamento(usuario_atual, id_agendamento):
+    if not _checkin_checkout_ativo():
+        return jsonify({
+            "erro": "Check-in e check-out estão temporariamente indisponíveis."
+        }), 503
     resposta, status = Agendamentos.fazer_checkout(bd, id_agendamento, usuario_atual)
     return jsonify(resposta), status
 

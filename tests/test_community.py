@@ -249,6 +249,8 @@ class CommunityTests(unittest.TestCase):
             self.assertEqual(client.get('/api/agendamentos/dashboard/g',headers=headers('a')).status_code,403)
             self.assertEqual(client.get('/api/agendamentos/guia/g',headers=headers('a')).status_code,403)
             self.assertEqual(client.get('/api/agendamentos/dashboard/g',headers=headers('g')).status_code,200)
+            self.assertEqual(client.put('/api/agendamentos/b1/checkin',headers=headers('g')).status_code,503)
+            self.assertEqual(client.put('/api/agendamentos/b1/checkout',headers=headers('g')).status_code,503)
             with patch('services.community.PushDevices.send',return_value={'enviados':0,'falhas':0}) as send:
                 client.post('/api/usuarios/fcm-token/teste',json={'id_usuario':'x'},headers=headers('t'))
                 self.assertEqual(send.call_args.args[1],'t')

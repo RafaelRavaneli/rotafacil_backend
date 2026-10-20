@@ -2165,9 +2165,9 @@
         "tags": [
           "Agendamentos"
         ],
-        "summary": "Iniciar trilha",
+        "summary": "Check-in temporariamente desativado",
         "operationId": "put_api_agendamentos_id_agendamento_checkin",
-        "description": "Dono da reserva, responsavel ou administrador. Exige status agendado. Coordenadas opcionais sao registradas somente se latitude e longitude forem enviadas juntas.",
+        "description": "Funcionalidade temporariamente desativada. Enquanto ENABLE_CHECKIN_CHECKOUT estiver desligado, a rota retorna HTTP 503.",
         "parameters": [
           {
             "name": "id_agendamento",
@@ -2258,9 +2258,9 @@
         "tags": [
           "Agendamentos"
         ],
-        "summary": "Concluir trilha",
+        "summary": "Check-out temporariamente desativado",
         "operationId": "put_api_agendamentos_id_agendamento_checkout",
-        "description": "Dono da reserva, responsavel ou administrador. Exige status em_andamento.",
+        "description": "Funcionalidade temporariamente desativada. Enquanto ENABLE_CHECKIN_CHECKOUT estiver desligado, a rota retorna HTTP 503.",
         "parameters": [
           {
             "name": "id_agendamento",
