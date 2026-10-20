@@ -529,6 +529,53 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(self.db.collection('usuarios').document(
             'a').get().to_dict()['nota_media'],5)
 
+    def test_finalizar_saida_antiga_normaliza_data_com_horario(self):
+        self.db.collection('trilhas').document('t1').set({
+            'nome': 'Roteiro', 'id_guia': 'g'})
+        self.db.collection('agendamentos').document('antiga').set({
+            'id_usuario': 't', 'id_trilha': 't1', 'status': 'confirmado',
+            'data_agendada': '2026-10-24'})
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            result, status = Agendamentos.finalizar_saida(
+                self.db, 't1', None, '2026-10-24T04:30:00.000', self.g)
+        self.assertEqual(status, 200, result)
+        self.assertEqual(result['reservas_finalizadas'], 1)
+        self.assertEqual(self.db.collection('agendamentos').document('antiga').get().to_dict()['status'], 'concluido')
+
+    def test_finalizar_preserva_id_legacy_e_reservas_de_outra_saida(self):
+        self.db.collection('trilhas').document('t1').set({
+            'nome': 'Roteiro', 'id_guia': 'g', 'datas': [
+                {'id': 'legacy-t1', 'data_hora_inicio': '2026-10-24T04:30'},
+                {'id': 'd2', 'data_hora_inicio': '2026-10-24T15:00'}]})
+        for identifier, departure in [('b1', 'legacy-t1'), ('b2', 'd2'), ('antiga', None)]:
+            self.db.collection('agendamentos').document(identifier).set({
+                'id_usuario': 't', 'id_trilha': 't1', 'status': 'confirmado',
+                'id_data': departure, 'data_agendada': '2026-10-24'})
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            result, status = Agendamentos.finalizar_saida(
+                self.db, 't1', 'legacy-t1', '2026-10-24', self.g)
+        self.assertEqual(status, 200, result)
+        self.assertEqual(result['reservas_finalizadas'], 1)
+        for identifier in ('b2', 'antiga'):
+            self.assertEqual(self.db.collection('agendamentos').document(identifier).get().to_dict()['status'], 'confirmado')
+        self.assertEqual(Agendamentos.finalizar_saida(
+            self.db, 't1', None, '2026-10-24', self.g)[1], 409)
+
+    def test_finalizar_saida_unica_inclui_reserva_sem_id_e_ignora_cancelada(self):
+        self.db.collection('trilhas').document('t1').set({
+            'nome': 'Roteiro', 'id_guia': 'g', 'datas': [
+                {'id': 'd1', 'data_hora_inicio': '2026-10-24T04:30'}]})
+        for identifier, state in [('antiga', 'confirmado'), ('cancelada', 'cancelado')]:
+            self.db.collection('agendamentos').document(identifier).set({
+                'id_usuario': 't', 'id_trilha': 't1', 'status': state,
+                'data_agendada': '2026-10-24'})
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            result, status = Agendamentos.finalizar_saida(
+                self.db, 't1', 'd1', None, self.g)
+        self.assertEqual(status, 200, result)
+        self.assertEqual(result['reservas_finalizadas'], 1)
+        self.assertEqual(self.db.collection('agendamentos').document('cancelada').get().to_dict()['status'], 'cancelado')
+
     def test_operador_pode_recusar_solicitacao_pendente(self):
         self.db.collection('trilhas').document('t1').set({
             'nome':'Roteiro','id_guia':'g'})

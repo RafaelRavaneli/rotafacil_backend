@@ -367,13 +367,39 @@ class Agendamentos:
             data_agendada = str(data_agendada or '').strip()
             if not id_data and not data_agendada:
                 return {"erro": "Informe a data do roteiro que foi finalizada."}, 400
+            datas = trilha.get('datas') or []
+            selecionada = next((item for item in datas
+                                if str(item.get('id')) == id_data), None) if id_data else None
+            if id_data and datas and selecionada is None:
+                return {"erro": "Data do roteiro não encontrada."}, 404
+
+            def dia(valor):
+                if hasattr(valor, 'isoformat'):
+                    valor = valor.isoformat()
+                try:
+                    return date.fromisoformat(str(valor or '')[:10]).isoformat()
+                except ValueError:
+                    return None
+
+            data_saida = dia((selecionada or {}).get('data_hora_inicio') or data_agendada)
+            datas_no_dia = [item for item in datas
+                            if data_saida and dia(item.get('data_hora_inicio')) == data_saida]
+            if not id_data and len(datas_no_dia) > 1:
+                return {"erro": "Selecione a saída para finalizar; há mais de uma nesta data."}, 409
+            if not id_data and not data_saida:
+                return {"erro": "Informe uma data válida para finalizar o roteiro."}, 400
+            # Reservas antigas não possuem id_data. Só associar pelo dia quando
+            # não houver duas saídas que tornem essa associação ambígua.
+            id_selecionado = id_data or (str(datas_no_dia[0].get('id')) if datas_no_dia else '')
             reservas = []
             for doc in db.collection('agendamentos').where(
                     'id_trilha', '==', id_trilha).stream():
                 dados = doc.to_dict() or {}
-                mesma_saida = (dados.get('id_data') == id_data if id_data
-                               else dados.get('data_agendada') == data_agendada)
-                if mesma_saida and str(dados.get('status') or '').lower() in {
+                id_reserva = str(dados.get('id_data') or '').strip()
+                mesma_saida = (id_reserva == id_selecionado if id_reserva else
+                               bool(data_saida and len(datas_no_dia) <= 1 and
+                                    dia(dados.get('data_agendada')) == data_saida))
+                if mesma_saida and str(dados.get('status') or '').strip().lower() in {
                         'confirmado', 'agendado', 'em_andamento'}:
                     reservas.append((doc.reference, dados))
             if not reservas:
