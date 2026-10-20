@@ -14,7 +14,7 @@ class Trilhas:
         'imagem_url', 'acessivel', 'itens_recomendados', 'trajeto',
         'id_guia', 'ativo', 'preco', 'capacidade', 'horario_inicio',
         'horario_fim', 'data_fim', 'data_hora_inicio', 'data_hora_fim',
-        'atividades',
+        'atividades', 'arquivado',
     }
 
     @staticmethod
@@ -43,7 +43,7 @@ class Trilhas:
             if not math.isfinite(preco) or preco < 0:
                 return 'Preço deve ser um número maior ou igual a zero'
             dados['preco'] = round(preco, 2)
-        for campo in ('ativo', 'acessivel'):
+        for campo in ('ativo', 'acessivel', 'arquivado'):
             if campo in dados and not isinstance(dados[campo], bool):
                 return f"{campo} deve ser verdadeiro ou falso"
         if dados.get('data_atividade'):
@@ -354,6 +354,7 @@ class Trilhas:
                 "criado_por": criado_por,
                 "id_guia": guia_responsavel,
                 "ativo": bool(dados.get("ativo", True)),
+                "arquivado": False,
                 "preco": dados.get("preco", 0),
                 "capacidade": capacidade,
                 "horario_inicio": horario_inicio,
@@ -461,6 +462,12 @@ class Trilhas:
 
             if dados.get('ativo') is False and Trilhas._tem_agendamentos_ativos(db, id_trilha):
                 return {'erro': 'Este roteiro possui reservas ativas. Cancele ou conclua essas reservas antes de desativá-lo.'}, 409
+
+            atual = doc.to_dict()
+            if dados.get('arquivado') is True and atual.get('ativo') is not False:
+                return {'erro': 'Desative o roteiro antes de arquivá-lo.'}, 409
+            if dados.get('ativo') is True:
+                dados['arquivado'] = False
 
             if 'id_guia' in dados and dados['id_guia'] != doc.to_dict().get('id_guia'):
                 if not isinstance(dados['id_guia'], str) or not Community.can_assign(db, usuario_atual, dados['id_guia']):

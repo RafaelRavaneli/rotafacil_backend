@@ -300,6 +300,27 @@ class CommunityTests(unittest.TestCase):
         self.assertFalse(self.db.collection('trilhas').document('t1').get().to_dict()['ativo'])
         self.assertEqual(len(self.db.collection('agendamentos').stream()),3)
 
+    def test_somente_roteiro_desativado_pode_ser_arquivado(self):
+        ref = self.db.collection('trilhas').document('t1')
+        ref.set({'ativo': True, 'arquivado': False, 'id_guia': 'g'})
+        self.assertEqual(
+            Trilhas.atualizar_trilha(self.db, 't1', {'arquivado': True}, self.g)[1],
+            409,
+        )
+        ref.update({'ativo': False})
+        self.assertEqual(
+            Trilhas.atualizar_trilha(self.db, 't1', {'arquivado': True}, self.g)[1],
+            200,
+        )
+        self.assertTrue(ref.get().to_dict()['arquivado'])
+        self.assertEqual(
+            Trilhas.atualizar_trilha(self.db, 't1', {'ativo': True}, self.g)[1],
+            200,
+        )
+        atual = ref.get().to_dict()
+        self.assertTrue(atual['ativo'])
+        self.assertFalse(atual['arquivado'])
+
     def test_falha_ao_conferir_reservas_nao_desativa_trilha(self):
         self.db.collection('trilhas').document('t1').set({'ativo':True,'id_guia':'g'})
         with patch.object(Trilhas,'_tem_agendamentos_ativos',side_effect=RuntimeError('Offline')):
