@@ -154,7 +154,7 @@
         ],
         "summary": "Solicitar recuperacao de senha",
         "operationId": "post_api_auth_senha_solicitar",
-        "description": "Resposta generica mesmo quando o e-mail nao existe. Token de recuperacao expira em 30 minutos.",
+        "description": "Envia link pessoal de uso único, com validade de 30 minutos. A URL pública usa fragmento para que o segredo não integre a query HTTP. A resposta é genérica para não revelar contas.",
         "security": [],
         "responses": {
           "200": {
@@ -210,11 +210,18 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "Operacao realizada.",
+            "description": "Operação concluída. Retorna sessão quando iniciar_sessao=true.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Mensagem"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Mensagem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Sessao"
+                    }
+                  ]
                 }
               }
             }
@@ -259,7 +266,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Recebe o segredo do link por POST. iniciar_sessao=true retorna sessão somente após validação e consumo. O link é de uso único e expira em 30 minutos. A redefinição exige nova_senha, invalida sessões anteriores e confirma o e-mail."
       }
     },
     "/api/usuarios/": {
@@ -269,7 +277,7 @@
         ],
         "summary": "Cadastrar usuario",
         "operationId": "post_api_usuarios",
-        "description": "Cadastro publico aceita usuario, guia e agencia. Admin nao pode ser cadastrado por esta rota. Guia e agencia exigem CPF/CNPJ valido.",
+        "description": "Cadastro publico aceita usuario, guia e agencia. Admin nao pode ser cadastrado por esta rota. Guia e agencia exigem CPF/CNPJ valido. Exige aceite expresso dos termos e ciência da política nas versões atuais. O servidor registra versões, hashes e horário UTC; dados de prova enviados pelo cliente não são utilizados.",
         "security": [],
         "responses": {
           "201": {
@@ -3209,7 +3217,8 @@
           "503": {
             "description": "Envio de e-mail indisponível"
           }
-        }
+        },
+        "description": "Envia link pessoal de uso único, com validade de 30 minutos. A URL pública usa fragmento para que o segredo não integre a query HTTP. A resposta é genérica para não revelar contas."
       }
     },
     "/api/auth/email/confirmar": {
@@ -3236,6 +3245,10 @@
                   },
                   "token": {
                     "type": "string"
+                  },
+                  "iniciar_sessao": {
+                    "type": "boolean",
+                    "default": false
                   }
                 }
               }
@@ -3244,13 +3257,112 @@
         },
         "responses": {
           "200": {
-            "description": "Solicitação processada"
+            "description": "Operação concluída. Retorna sessão quando iniciar_sessao=true.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Mensagem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Sessao"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "400": {
             "description": "Dados ou código inválidos"
           },
           "503": {
             "description": "Envio de e-mail indisponível"
+          }
+        },
+        "description": "Recebe o segredo do link por POST. iniciar_sessao=true retorna sessão somente após validação e consumo. O link é de uso único e expira em 30 minutos. A redefinição exige nova_senha, invalida sessões anteriores e confirma o e-mail."
+      }
+    },
+    "/api/usuarios/documentos-legais": {
+      "get": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Consultar documentos legais atuais",
+        "operationId": "get_documentos_legais",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Termos e política com conteúdo, versão e SHA-256.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/aceite-legal": {
+      "post": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Registrar aceite na própria conta",
+        "operationId": "post_aceite_legal",
+        "description": "Usa exclusivamente o ID do JWT. Preserva histórico e não regrava um aceite idêntico. Não bloqueia contas antigas por falta de aceite retroativo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AceiteLegal"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aceite registrado ou previamente registrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Indicadores ou versões inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conta inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         }
       }
@@ -3377,6 +3489,10 @@
             "format": "password",
             "minLength": 6,
             "example": "novaSenha123"
+          },
+          "iniciar_sessao": {
+            "type": "boolean",
+            "default": false
           }
         },
         "required": [
@@ -3438,12 +3554,36 @@
             "type": "string",
             "description": "Validade opcional no formato AAAA-MM-DD.",
             "example": "2029-12-31"
+          },
+          "aceite_termos": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "ciencia_privacidade": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "termos_versao": {
+            "type": "string",
+            "example": "2026-10-20"
+          },
+          "privacidade_versao": {
+            "type": "string",
+            "example": "2026-10-20"
           }
         },
         "required": [
           "nome",
           "email",
-          "senha"
+          "senha",
+          "aceite_termos",
+          "ciencia_privacidade",
+          "termos_versao",
+          "privacidade_versao"
         ]
       },
       "PerfilEditavel": {
@@ -4354,6 +4494,38 @@
             "type": "number"
           }
         }
+      },
+      "AceiteLegal": {
+        "type": "object",
+        "required": [
+          "aceite_termos",
+          "ciencia_privacidade",
+          "termos_versao",
+          "privacidade_versao"
+        ],
+        "properties": {
+          "aceite_termos": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "ciencia_privacidade": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "termos_versao": {
+            "type": "string",
+            "example": "2026-10-20"
+          },
+          "privacidade_versao": {
+            "type": "string",
+            "example": "2026-10-20"
+          }
+        },
+        "description": "Aceite expresso dos termos e ciência da política. Não representa consentimento para permissões opcionais."
       }
     }
   }

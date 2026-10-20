@@ -1,3 +1,4 @@
+from services.documentos_legais import DocumentosLegais
 from services.verificacao_email import VerificacaoEmail
 import re
 import os
@@ -285,6 +286,11 @@ class Usuarios:
                 except ValueError as error:
                     return {'erro': str(error)}, 400
                     
+            try:
+                aceite = DocumentosLegais.validar_aceite(dados)
+            except ValueError as error:
+                return {'erro': str(error), 'codigo': 'ACEITE_LEGAL_NECESSARIO'}, 400
+
             id_usuario = str(uuid.uuid4())
             usuario = {
                 "id": id_usuario,
@@ -300,6 +306,8 @@ class Usuarios:
                 **cadastur,
                 "contato_emergencia_nome": dados.get("contato_emergencia_nome"),
                 "contato_emergencia_telefone": dados.get("contato_emergencia_telefone"),
+                "aceite_legal": aceite,
+                "historico_aceites_legais": [aceite],
                 "verificado": False,
                 "email_confirmado": False,
                 "exigir_confirmacao_email": VerificacaoEmail.habilitada(),

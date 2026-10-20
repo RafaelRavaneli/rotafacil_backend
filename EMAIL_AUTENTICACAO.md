@@ -1,5 +1,7 @@
 # E-mail de autenticação — configuração e checkpoint
 
+> Atualização local de 20/10/2026, ainda sem publicação: as interfaces de confirmação e recuperação passam a usar links e iniciar sessão após validação. O contrato e as garantias atuais estão em [LINKS_AUTENTICACAO.md](LINKS_AUTENTICACAO.md). As referências a cópia de códigos abaixo descrevem a implementação anterior.
+
 ## Decisões de 20/10/2026
 
 - Remetente: `nao.responda.rotafacil@gmail.com`.

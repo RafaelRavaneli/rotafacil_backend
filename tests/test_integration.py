@@ -116,7 +116,7 @@ class IntegrationTests(unittest.TestCase):
     def test_cadastro_recebe_documento_frontend(self):
         self.db.collection.return_value.where.return_value.stream.return_value = []
         result, status = Usuarios.cadastrar_usuario(self.db, {
-            'nome':'Guia','email':'guia@example.test','senha':'senha123',
+            'aceite_termos': True, 'ciencia_privacidade': True, 'termos_versao': '2026-10-20', 'privacidade_versao': '2026-10-20', 'nome':'Guia','email':'guia@example.test','senha':'senha123',
             'tipo':'guia','documento':'52998224725', 'cadastur_numero':'12.345.678/0001-90'})
         self.assertEqual(status, 201, result)
         saved = self.db.collection.return_value.document.return_value.set.call_args.args[0]
@@ -126,7 +126,7 @@ class IntegrationTests(unittest.TestCase):
 
     def test_cadastur_obrigatorio_para_ambos_perfis_sem_exigir_do_turista(self):
         self.db.collection.return_value.where.return_value.stream.return_value = []
-        base = {'nome':'Pessoa', 'email':'pessoa@example.test', 'senha':'senha123'}
+        base = {'aceite_termos': True, 'ciencia_privacidade': True, 'termos_versao': '2026-10-20', 'privacidade_versao': '2026-10-20', 'nome':'Pessoa', 'email':'pessoa@example.test', 'senha':'senha123'}
         for tipo, documento in [('guia','52998224725'), ('agencia','11222333000181')]:
             result, status = Usuarios.cadastrar_usuario(self.db, {**base, 'tipo':tipo, 'documento':documento})
             self.assertEqual(status,400,result)

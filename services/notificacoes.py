@@ -135,20 +135,24 @@ class Notificacoes:
 
     @staticmethod
     def enviar_email_redefinicao(destinatario, token):
+        from services.links_autenticacao import link_autenticacao
+        link = link_autenticacao('redefinir-senha', destinatario, token)
         return Notificacoes._enviar_email(
             destinatario, 'RotaFácil - Recuperação de senha',
             'Você solicitou a recuperação de senha no RotaFácil.\n\n'
-            f'Copie o código abaixo e informe-o na tela Recuperar senha:\n\n{token}\n\n'
-            'Este código é pessoal, de uso único e expira em 30 minutos.\n'
+            f'Abra o link para escolher uma nova senha:\n\n{link}\n\n'
+            'Este link é pessoal, de uso único e expira em 30 minutos.\n'
             'Se não foi você, ignore esta mensagem. Sua senha não foi alterada.')
 
     @staticmethod
     def enviar_email_confirmacao(destinatario, token):
+        from services.links_autenticacao import link_autenticacao
+        link = link_autenticacao('confirmar-email', destinatario, token)
         return Notificacoes._enviar_email(
             destinatario, 'RotaFácil - Confirme seu e-mail',
             'Confirme seu endereço de e-mail no RotaFácil.\n\n'
-            f'Copie o código abaixo e informe-o na tela Confirmar e-mail:\n\n{token}\n\n'
-            'Este código é pessoal, de uso único e expira em 30 minutos.\n'
+            f'Abra o link e confirme para entrar na sua conta:\n\n{link}\n\n'
+            'Este link é pessoal, de uso único e expira em 30 minutos.\n'
             'A confirmação de e-mail não substitui a análise profissional de guia ou agência.\n'
             'Se não foi você, ignore esta mensagem.')
 

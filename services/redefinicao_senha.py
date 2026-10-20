@@ -31,7 +31,7 @@ class RedefinicaoSenha:
             # Mensagem genérica: usada tanto pra sucesso real quanto quando
             # o e-mail não existe, para não revelar quais e-mails têm conta.
             mensagem_generica = {
-                "mensagem": "Se o e-mail informado estiver cadastrado, um código de redefinição foi enviado."
+                "mensagem": "Se o e-mail informado estiver cadastrado, um link de redefinição foi enviado."
             }
 
             usuarios_ref = db.collection('usuarios').where('email', '==', email).stream()
@@ -43,6 +43,8 @@ class RedefinicaoSenha:
             usuario_doc = docs[0]
             id_usuario = usuario_doc.id
             dados_usuario = usuario_doc.to_dict()
+            if not dados_usuario.get('ativo', True):
+                return mensagem_generica, 200
 
             agora = datetime.datetime.now(datetime.timezone.utc)
 
@@ -70,6 +72,8 @@ class RedefinicaoSenha:
             token_ref = db.collection('redefinicoes_senha').document(token_hash)
             token_ref.set({
                 "id_usuario": id_usuario,
+                "email": email,
+                "versao_auth": dados_usuario.get('versao_auth', 0),
                 "token_hash": token_hash,
                 "criado_em": agora,
                 "expira_em": expira_em,
@@ -141,6 +145,20 @@ class RedefinicaoSenha:
 
             if not usuario_doc.exists:
                 return {"erro": "Usuário associado a este token não foi encontrado"}, 404
+            atual = usuario_doc.to_dict() or {}
+            if (not atual.get('ativo', True) or
+                    ('versao_auth' in dados_redefinicao and dados_redefinicao['versao_auth'] != atual.get('versao_auth', 0)) or
+                    (dados_redefinicao.get('email') and
+                    dados_redefinicao['email'] != atual.get('email'))):
+                return {'erro': 'Link inválido. Solicite uma nova recuperação.'}, 400
+            nova_versao = atual.get('versao_auth', 0) + 1
+            sessao = {}
+            if dados.get('iniciar_sessao') is True:
+                from services.autenticacao import Autenticacao
+                sessao = {'email': atual.get('email'), 'nome': atual.get('nome', 'Usuário'),
+                          'id': usuario_doc.id, 'tipo': atual.get('tipo', 'usuario'),
+                          'token': Autenticacao.make_token(atual.get('email'), usuario_doc.id,
+                              atual.get('tipo', 'usuario'), nova_versao)}
 
             # Consome o código com controle de concorrência antes de alterar a senha.
             try:
@@ -148,12 +166,14 @@ class RedefinicaoSenha:
                     option=LastUpdateOption(doc_redefinicao.update_time))
                 usuario_ref.update({
                     "senha": generate_password_hash(nova_senha),
-                    "versao_auth": (usuario_doc.to_dict() or {}).get("versao_auth", 0) + 1
+                    "versao_auth": nova_versao,
+                    "email_confirmado": True,
+                    "email_confirmado_em": agora,
                 }, option=LastUpdateOption(usuario_doc.update_time))
             except FailedPrecondition:
                 return {"erro": "A solicitação mudou. Solicite outro código de recuperação."}, 409
 
-            return {"mensagem": "Senha redefinida com sucesso!"}, 200
+            return {"mensagem": "Senha redefinida com sucesso!", **sessao}, 200
 
         except Exception as e:
             return {"erro": f"Erro interno: {str(e)}"}, 500

@@ -5,6 +5,21 @@ from services.autenticacao import token_obrigatorio, requer_papel, eh_dono_ou_te
 
 usuarios_bp = Blueprint('usuarios', __name__)
 
+
+@usuarios_bp.route('/documentos-legais', methods=['GET'])
+def documentos_legais():
+    from services.documentos_legais import DocumentosLegais
+    return jsonify(DocumentosLegais.documentos()), 200
+
+
+@usuarios_bp.route('/aceite-legal', methods=['POST'])
+@token_obrigatorio
+def registrar_aceite_legal(usuario_atual):
+    from services.documentos_legais import DocumentosLegais
+    resposta, status = DocumentosLegais.registrar(
+        bd, usuario_atual, request.get_json(silent=True) or {})
+    return jsonify(resposta), status
+
 # --- Cadastro: público, sem RBAC (ninguém tem token ainda) ---
 @usuarios_bp.route('/', methods=['POST'])
 def cadastrar_usuario():

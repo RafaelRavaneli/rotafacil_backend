@@ -194,7 +194,7 @@ class CommunityTests(unittest.TestCase):
         from services.verificacao_email import VerificacaoEmail
         from werkzeug.security import generate_password_hash
         with patch('services.verificacao_email.Notificacoes.enviar_email_confirmacao', return_value=({}, 200)) as send:
-            result, status = Usuarios.cadastrar_usuario(self.db, {'nome': 'Nova', 'email': 'nova@example.test', 'senha': 'senha123'})
+            result, status = Usuarios.cadastrar_usuario(self.db, {'aceite_termos': True, 'ciencia_privacidade': True, 'termos_versao': '2026-10-20', 'privacidade_versao': '2026-10-20', 'nome': 'Nova', 'email': 'nova@example.test', 'senha': 'senha123'})
             self.assertEqual(status, 201, result)
             token = send.call_args.args[1]
         self.assertTrue(result['confirmacao_email_necessaria'])
