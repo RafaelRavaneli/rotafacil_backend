@@ -14,7 +14,7 @@ class Trilhas:
         'imagem_url', 'acessivel', 'itens_recomendados', 'trajeto',
         'id_guia', 'ativo', 'preco', 'capacidade', 'horario_inicio',
         'horario_fim', 'data_fim', 'data_hora_inicio', 'data_hora_fim',
-        'atividades', 'arquivado',
+        'atividades', 'arquivado', 'ponto_encontro',
     }
 
     @staticmethod
@@ -23,7 +23,8 @@ class Trilhas:
         if proibidos:
             return f"Campos não permitidos: {', '.join(proibidos)}"
         limites = {'nome': 160, 'descricao': 4000, 'dificuldade': 40,
-                   'modalidade': 80, 'cidade': 120, 'estado': 2}
+                   'modalidade': 80, 'cidade': 120, 'estado': 2,
+                   'ponto_encontro': 250}
         for campo, limite in limites.items():
             if campo not in dados:
                 continue
@@ -346,6 +347,7 @@ class Trilhas:
                 "data_hora_fim": data_hora_fim,
                 "latitude": latitude,
                 "longitude": longitude,
+                "ponto_encontro": dados.get("ponto_encontro"),
                 "geohash": geohash,
                 "imagem_url": dados.get("imagem_url"),
                 "acessivel": bool(dados.get("acessivel", False)),

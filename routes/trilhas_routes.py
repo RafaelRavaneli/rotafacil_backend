@@ -2,9 +2,18 @@ from flask import Blueprint, request, jsonify
 from models.database import bd
 from services.trilhas import Trilhas
 from services.autenticacao import token_obrigatorio, requer_papel
+from services.geocodificacao import Geocodificacao
 
 # Inicializa o Blueprint
 trilhas_bp = Blueprint('trilhas', __name__)
+
+
+@trilhas_bp.route('/geocodificar', methods=['GET'])
+@token_obrigatorio
+@requer_papel('guia', 'agencia')
+def geocodificar(usuario_atual):
+    resposta, status = Geocodificacao.buscar(request.args.get('q'))
+    return jsonify(resposta), status
 
 # Apenas Guias e Agências podem criar trilhas
 @trilhas_bp.route('/', methods=['POST'])
