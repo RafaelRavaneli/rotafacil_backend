@@ -11,6 +11,18 @@ class Agendamentos:
         return str(status or '').strip().lower() in Agendamentos.STATUS_ATIVOS
 
     @staticmethod
+    def _usuario_por_identificador(db, identificador):
+        if not identificador:
+            return None, {}
+        documento = db.collection('usuarios').document(str(identificador)).get()
+        if documento.exists:
+            return documento.id, documento.to_dict() or {}
+        documento = next(iter(db.collection('usuarios').where(
+            'email', '==', identificador).stream()), None)
+        return ((documento.id, documento.to_dict() or {})
+                if documento is not None and documento.exists else (None, {}))
+
+    @staticmethod
     def _serializar(db, dados, usuarios=None, trilhas=None):
         item = dict(dados or {})
         usuarios = usuarios if usuarios is not None else {}
@@ -22,9 +34,22 @@ class Agendamentos:
             usuarios[usuario_id] = (doc.to_dict() or {}).get('nome') if doc.exists else None
         if trilha_id and trilha_id not in trilhas:
             doc = db.collection('trilhas').document(trilha_id).get()
-            trilhas[trilha_id] = (doc.to_dict() or {}).get('nome') if doc.exists else None
+            trilhas[trilha_id] = (doc.to_dict() or {}) if doc.exists else {}
         item['nome_usuario'] = usuarios.get(usuario_id)
-        item['nome_trilha'] = trilhas.get(trilha_id)
+        dados_trilha = trilhas.get(trilha_id) or {}
+        item['nome_trilha'] = dados_trilha.get('nome')
+        guia_id, guia = Agendamentos._usuario_por_identificador(
+            db, item.get('id_guia'))
+        item['id_guia'] = guia_id or item.get('id_guia')
+        item['nome_guia'] = guia.get('nome')
+        item['telefone_guia'] = guia.get('telefone')
+        agencia_id, agencia = Agendamentos._usuario_por_identificador(
+            db, dados_trilha.get('criado_por'))
+        if str(agencia.get('tipo') or '').strip().lower() == 'agencia':
+            item['id_agencia'] = agencia_id
+            item['nome_agencia'] = agencia.get('nome')
+        item['avaliado'] = bool(item.get('id') and db.collection(
+            'avaliacoes').document(str(item.get('id'))).get().exists)
         for campo in ('createdAt', 'cancelado_em'):
             valor = item.get(campo)
             if hasattr(valor, 'isoformat'):
@@ -157,7 +182,7 @@ class Agendamentos:
                 "data_hora_fim": (data_selecionada or {}).get('data_hora_fim') or
                                  dados_trilha.get('data_hora_fim'),
                 "valor_pago": dados_trilha.get('preco', 0),
-                "status": "agendado",
+                "status": "pendente",
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
 
@@ -286,6 +311,83 @@ class Agendamentos:
             return {"mensagem": "agendamento cancelado com sucesso !"}, 200
         except Exception as e:
             return {"erro": f"Erro ao cancelar agendamento: {str(e)}"}, 500
+
+    @staticmethod
+    def responder_agendamento(db, id_agendamento, usuario_atual, resposta):
+        try:
+            resposta = str(resposta or '').strip().lower()
+            if resposta not in {'confirmado', 'recusado'}:
+                return {"erro": "Use status confirmado ou recusado."}, 400
+            doc_ref = db.collection('agendamentos').document(id_agendamento)
+            doc = doc_ref.get()
+            if not doc.exists:
+                return {"erro": "Agendamento não encontrado"}, 404
+            dados = doc.to_dict() or {}
+            if not Agendamentos._usuario_pode_operar_agendamento(
+                    db, dados, usuario_atual):
+                return {"erro": "Acesso negado."}, 403
+            if str(dados.get('status') or '').strip().lower() != 'pendente':
+                return {"erro": "Esta solicitação já foi respondida."}, 409
+            doc_ref.update({
+                'status': resposta,
+                'respondido_em': firestore.SERVER_TIMESTAMP,
+                'respondido_por': usuario_atual.get('id'),
+            })
+            trilha = db.collection('trilhas').document(
+                dados.get('id_trilha')).get()
+            nome = (trilha.to_dict() or {}).get('nome') if trilha.exists else 'roteiro'
+            titulo = ('Reserva confirmada' if resposta == 'confirmado'
+                      else 'Reserva recusada')
+            Notificacoes.notificar_usuario(
+                db, dados.get('id_usuario'), titulo,
+                f"Sua solicitação para '{nome}' foi {resposta}.",
+                dados={'tipo': 'resposta_agendamento',
+                       'id_agendamento': id_agendamento})
+            return {"mensagem": f"Agendamento {resposta} com sucesso."}, 200
+        except Exception as e:
+            return {"erro": f"Erro ao responder agendamento: {str(e)}"}, 500
+
+    @staticmethod
+    def finalizar_saida(db, id_trilha, id_data, data_agendada, usuario_atual):
+        try:
+            trilha_doc = db.collection('trilhas').document(id_trilha).get()
+            if not trilha_doc.exists:
+                return {"erro": "Roteiro não encontrado"}, 404
+            trilha = trilha_doc.to_dict() or {}
+            amostra = {'id_trilha': id_trilha, 'id_guia': trilha.get('id_guia')}
+            if not Agendamentos._usuario_pode_operar_agendamento(
+                    db, amostra, usuario_atual):
+                return {"erro": "Acesso negado."}, 403
+            id_data = str(id_data or '').strip()
+            data_agendada = str(data_agendada or '').strip()
+            if not id_data and not data_agendada:
+                return {"erro": "Informe a data do roteiro que foi finalizada."}, 400
+            reservas = []
+            for doc in db.collection('agendamentos').where(
+                    'id_trilha', '==', id_trilha).stream():
+                dados = doc.to_dict() or {}
+                mesma_saida = (dados.get('id_data') == id_data if id_data
+                               else dados.get('data_agendada') == data_agendada)
+                if mesma_saida and str(dados.get('status') or '').lower() in {
+                        'confirmado', 'agendado', 'em_andamento'}:
+                    reservas.append((doc.reference, dados))
+            if not reservas:
+                return {"erro": "Nenhuma reserva confirmada nesta data."}, 409
+            for referencia, dados in reservas:
+                referencia.update({
+                    'status': 'concluido',
+                    'finalizado_em': firestore.SERVER_TIMESTAMP,
+                    'finalizado_por': usuario_atual.get('id'),
+                })
+                Notificacoes.notificar_usuario(
+                    db, dados.get('id_usuario'), 'Roteiro finalizado',
+                    f"O roteiro '{trilha.get('nome', 'Roteiro')}' foi finalizado. Sua avaliação já está disponível.",
+                    dados={'tipo': 'roteiro_finalizado',
+                           'id_agendamento': dados.get('id')})
+            return {"mensagem": "Saída finalizada com sucesso.",
+                    "reservas_finalizadas": len(reservas)}, 200
+        except Exception as e:
+            return {"erro": f"Erro ao finalizar a saída: {str(e)}"}, 500
 
     @staticmethod
     def fazer_checkin(db, id_agendamento, usuario_atual, latitude=None, longitude=None):

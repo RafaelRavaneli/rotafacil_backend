@@ -68,6 +68,25 @@ def cancelar_agendamento(usuario_atual, id_agendamento):
     resposta, status = Agendamentos.cancelar_agendamento(bd, id_agendamento, usuario_atual)
     return jsonify(resposta), status
 
+@agendamentos_bp.route('/<id_agendamento>/responder', methods=['PUT'])
+@token_obrigatorio
+@requer_papel('guia', 'agencia', 'admin')
+def responder_agendamento(usuario_atual, id_agendamento):
+    dados = request.get_json(silent=True) or {}
+    resposta, status = Agendamentos.responder_agendamento(
+        bd, id_agendamento, usuario_atual, dados.get('status'))
+    return jsonify(resposta), status
+
+@agendamentos_bp.route('/finalizar-saida', methods=['PUT'])
+@token_obrigatorio
+@requer_papel('guia', 'agencia', 'admin')
+def finalizar_saida(usuario_atual):
+    dados = request.get_json(silent=True) or {}
+    resposta, status = Agendamentos.finalizar_saida(
+        bd, dados.get('id_trilha'), dados.get('id_data'),
+        dados.get('data_agendada'), usuario_atual)
+    return jsonify(resposta), status
+
 # --- Dashboard do guia/agência: dono ou admin ---
 @agendamentos_bp.route('/dashboard/<id_guia>', methods=['GET'])
 @token_obrigatorio

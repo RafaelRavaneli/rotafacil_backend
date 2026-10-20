@@ -424,7 +424,7 @@ class CommunityTests(unittest.TestCase):
                 'id_data':'saida-2','data_agendada':'2099-01-01'})
         self.assertEqual(status,201,reserva)
         salva=self.db.collection('agendamentos').document(reserva['id']).get().to_dict()
-        self.assertEqual(salva['status'],'agendado')
+        self.assertEqual(salva['status'],'pendente')
         self.assertEqual(salva['id_data'],'saida-2')
         self.assertEqual(salva['data_agendada'],'2099-09-12')
         self.assertEqual(salva['data_hora_inicio'],'2099-09-12T07:00')
@@ -450,6 +450,55 @@ class CommunityTests(unittest.TestCase):
         guia,status=Agendamentos.listar_agendamentos_guia(self.db,'g')
         self.assertEqual(status,200)
         self.assertEqual([item['id'] for item in guia],['ativa','cancelada'])
+
+    def test_guia_confirma_e_finaliza_saida_liberando_avaliacao_completa(self):
+        self.db.collection('trilhas').document('t1').set({
+            'nome':'Roteiro','id_guia':'g','criado_por':'a@example.test',
+            'datas':[{'id':'d1','data_hora_inicio':'2026-10-10T08:00',
+                      'data_hora_fim':'2026-10-10T12:00'}]})
+        self.db.collection('agendamentos').document('b1').set({
+            'id':'b1','id_usuario':'t','id_trilha':'t1','id_guia':'g',
+            'id_data':'d1','data_agendada':'2026-10-10','status':'pendente'})
+        self.assertEqual(Agendamentos.responder_agendamento(
+            self.db,'b1',self.t,'confirmado')[1],403)
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            result,status=Agendamentos.responder_agendamento(
+                self.db,'b1',self.g,'confirmado')
+        self.assertEqual(status,200,result)
+        self.assertEqual(self.db.collection('agendamentos').document(
+            'b1').get().to_dict()['status'],'confirmado')
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            result,status=Agendamentos.finalizar_saida(
+                self.db,'t1','d1',None,self.a)
+        self.assertEqual(status,200,result)
+        self.assertEqual(result['reservas_finalizadas'],1)
+        self.assertEqual(self.db.collection('agendamentos').document(
+            'b1').get().to_dict()['status'],'concluido')
+        result,status=Avaliacoes.adicionar_avaliacao(
+            self.db,'t','t1',0,'Experiência avaliada','t',
+            id_agendamento='b1',nota_guia=4,nota_agencia=5)
+        self.assertEqual(status,201,result)
+        avaliacao=self.db.collection('avaliacoes').document('b1').get().to_dict()
+        self.assertEqual(avaliacao['nota_roteiro'],0)
+        self.assertEqual(avaliacao['nota_guia'],4)
+        self.assertEqual(avaliacao['nota_agencia'],5)
+        self.assertEqual(self.db.collection('usuarios').document(
+            'g').get().to_dict()['nota_media'],4)
+        self.assertEqual(self.db.collection('usuarios').document(
+            'a').get().to_dict()['nota_media'],5)
+
+    def test_operador_pode_recusar_solicitacao_pendente(self):
+        self.db.collection('trilhas').document('t1').set({
+            'nome':'Roteiro','id_guia':'g'})
+        self.db.collection('agendamentos').document('b1').set({
+            'id':'b1','id_usuario':'t','id_trilha':'t1','id_guia':'g',
+            'status':'pendente'})
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            result,status=Agendamentos.responder_agendamento(
+                self.db,'b1',self.g,'recusado')
+        self.assertEqual(status,200,result)
+        self.assertEqual(self.db.collection('agendamentos').document(
+            'b1').get().to_dict()['status'],'recusado')
 
     def test_reserva_usa_preco_do_servidor_bloqueia_duplicidade_e_lotacao(self):
         self.db.collection('trilhas').document('t1').set({

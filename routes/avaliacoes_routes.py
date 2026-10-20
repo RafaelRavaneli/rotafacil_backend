@@ -16,7 +16,10 @@ def adicionar_avaliacao(usuario_atual):
         dados.get('id_trilha'),
         dados.get('nota'),
         dados.get('comentario'),
-        usuario_atual.get('nome')
+        usuario_atual.get('nome'),
+        id_agendamento=dados.get('id_agendamento'),
+        nota_guia=dados.get('nota_guia'),
+        nota_agencia=dados.get('nota_agencia'),
     )
     return jsonify(resposta), status
 
