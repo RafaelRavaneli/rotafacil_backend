@@ -4,6 +4,7 @@ import smtplib
 import os
 import datetime
 import uuid
+import logging
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from services.community import PushDevices
@@ -110,6 +111,7 @@ class Notificacoes:
         remetente = str(os.getenv('EMAIL_REMETENTE') or '').strip()
         senha_app = str(os.getenv('EMAIL_SENHA_APP') or '').replace(' ', '')
         if not remetente or not senha_app:
+            logging.warning('smtp.configuration_missing')
             return {'erro': 'Envio de e-mail não configurado.'}, 503
         try:
             msg = EmailMessage()
@@ -121,7 +123,14 @@ class Notificacoes:
                 servidor.login(remetente, senha_app)
                 servidor.send_message(msg)
             return {'mensagem': 'E-mail enviado.'}, 200
-        except (smtplib.SMTPException, OSError, ValueError):
+        except smtplib.SMTPAuthenticationError:
+            logging.warning('smtp.authentication_failed')
+            return {'erro': 'Não foi possível enviar o e-mail. Tente novamente mais tarde.'}, 503
+        except smtplib.SMTPException:
+            logging.warning('smtp.delivery_rejected')
+            return {'erro': 'Não foi possível enviar o e-mail. Tente novamente mais tarde.'}, 503
+        except (OSError, ValueError):
+            logging.warning('smtp.connection_failed')
             return {'erro': 'Não foi possível enviar o e-mail. Tente novamente mais tarde.'}, 503
 
     @staticmethod
