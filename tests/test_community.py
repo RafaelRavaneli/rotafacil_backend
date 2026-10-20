@@ -160,6 +160,64 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(len(saved), 1)
         self.assertNotIn('token', saved[0].to_dict())
 
+    def test_confirmacao_email_codigo_unico_expira_e_nao_vaza_token(self):
+        from services.verificacao_email import VerificacaoEmail
+        from datetime import datetime, timedelta, timezone
+        with patch('services.verificacao_email.Notificacoes.enviar_email_confirmacao', return_value=({}, 200)) as send:
+            self.assertEqual(VerificacaoEmail.solicitar(self.db, {'email': ' T@EXAMPLE.TEST '})[1], 200)
+            token = send.call_args.args[1]
+            VerificacaoEmail.solicitar(self.db, {'email': 't@example.test'})
+            send.assert_called_once()
+        ref = self.db.collection('verificacoes_email').document('t')
+        self.assertNotIn(token, str(ref.get().to_dict()))
+        self.assertEqual(VerificacaoEmail.confirmar(self.db, {'email': 'x@example.test', 'token': token})[1], 400)
+        self.assertEqual(VerificacaoEmail.confirmar(self.db, {'email': 't@example.test', 'token': token})[1], 200)
+        self.assertTrue(self.db.collection('usuarios').document('t').get().to_dict()['email_confirmado'])
+        self.assertEqual(VerificacaoEmail.confirmar(self.db, {'email': 't@example.test', 'token': token})[1], 400)
+        ref.update({'usado': False, 'expira_em': datetime.now(timezone.utc) - timedelta(seconds=1)})
+        self.assertEqual(VerificacaoEmail.confirmar(self.db, {'email': 't@example.test', 'token': token})[1], 400)
+
+    def test_confirmacao_email_falha_envio_permite_reenvio_e_endereco_alterado_invalida_codigo(self):
+        from services.verificacao_email import VerificacaoEmail
+        with patch('services.verificacao_email.Notificacoes.enviar_email_confirmacao', return_value=({}, 503)):
+            self.assertEqual(VerificacaoEmail.solicitar(self.db, {'email': 't@example.test'})[1], 503)
+        self.assertFalse(self.db.collection('verificacoes_email').document('t').get().exists)
+        with patch('services.verificacao_email.Notificacoes.enviar_email_confirmacao', return_value=({}, 200)) as send:
+            VerificacaoEmail.solicitar(self.db, {'email': 't@example.test'})
+            token = send.call_args.args[1]
+        self.db.collection('usuarios').document('t').update({'email': 'nova@example.test'})
+        self.assertEqual(VerificacaoEmail.confirmar(self.db, {'email': 'nova@example.test', 'token': token})[1], 400)
+        self.assertEqual(VerificacaoEmail.confirmar(self.db, {'email': 't@example.test', 'token': token})[1], 400)
+
+    @patch.dict(os.environ, {'KEY': 'email-tests-key-only-' * 3, 'EMAIL_VERIFICATION_ENABLED': 'true'})
+    def test_nova_conta_exige_confirmacao_sem_bloquear_legada(self):
+        from services.verificacao_email import VerificacaoEmail
+        from werkzeug.security import generate_password_hash
+        with patch('services.verificacao_email.Notificacoes.enviar_email_confirmacao', return_value=({}, 200)) as send:
+            result, status = Usuarios.cadastrar_usuario(self.db, {'nome': 'Nova', 'email': 'nova@example.test', 'senha': 'senha123'})
+            self.assertEqual(status, 201, result)
+            token = send.call_args.args[1]
+        self.assertTrue(result['confirmacao_email_necessaria'])
+        result, status = Autenticacao.login(self.db, {'email': 'nova@example.test', 'senha': 'senha123'})
+        self.assertEqual(status, 403)
+        self.assertEqual(result['codigo'], 'EMAIL_NAO_CONFIRMADO')
+        VerificacaoEmail.confirmar(self.db, {'email': 'nova@example.test', 'token': token})
+        self.assertEqual(Autenticacao.login(self.db, {'email': 'nova@example.test', 'senha': 'senha123'})[1], 200)
+        self.db.collection('usuarios').document('t').update({'senha': generate_password_hash('senha123')})
+        self.assertEqual(Autenticacao.login(self.db, {'email': 't@example.test', 'senha': 'senha123'})[1], 200)
+
+    def test_recuperacao_senha_invalida_codigo_usado_e_sessoes_anteriores(self):
+        from services.redefinicao_senha import RedefinicaoSenha
+        from werkzeug.security import check_password_hash
+        with patch('services.redefinicao_senha.Notificacoes.enviar_email_redefinicao', return_value=({}, 200)) as send:
+            self.assertEqual(RedefinicaoSenha.solicitar_redefinicao(self.db, {'email': ' T@EXAMPLE.TEST '})[1], 200)
+            token = send.call_args.args[1]
+        self.assertEqual(RedefinicaoSenha.redefinir_senha(self.db, {'token': token, 'nova_senha': 'nova123'})[1], 200)
+        usuario = self.db.collection('usuarios').document('t').get().to_dict()
+        self.assertTrue(check_password_hash(usuario['senha'], 'nova123'))
+        self.assertEqual(usuario['versao_auth'], 1)
+        self.assertEqual(RedefinicaoSenha.redefinir_senha(self.db, {'token': token, 'nova_senha': 'outra123'})[1], 400)
+
     def test_convite_aceite_e_vinculo_da_trilha(self):
         self.denied(403,Community.invite,self.db,self.t,{'id_guia':'g'})
         invite=Community.invite(self.db,self.a,{'id_guia':'g'})

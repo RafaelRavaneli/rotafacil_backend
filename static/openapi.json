@@ -3172,6 +3172,88 @@
           }
         }
       }
+    },
+    "/api/auth/email/solicitar": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "summary": "Solicitar código de confirmação de e-mail",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Solicitação processada"
+          },
+          "400": {
+            "description": "Dados ou código inválidos"
+          },
+          "503": {
+            "description": "Envio de e-mail indisponível"
+          }
+        }
+      }
+    },
+    "/api/auth/email/confirmar": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "summary": "Confirmar endereço de e-mail",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "token"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Solicitação processada"
+          },
+          "400": {
+            "description": "Dados ou código inválidos"
+          },
+          "503": {
+            "description": "Envio de e-mail indisponível"
+          }
+        }
+      }
     }
   },
   "components": {

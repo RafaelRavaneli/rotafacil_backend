@@ -105,37 +105,43 @@ class Notificacoes:
         except Exception as error:
             return {'erro': f'Erro ao salvar preferências: {error}'}, 500
 
-    # --- E-mail (redefinição de senha) ---
     @staticmethod
-    def enviar_email_redefinicao(destinatario, token):
+    def _enviar_email(destinatario, assunto, mensagem):
+        remetente = str(os.getenv('EMAIL_REMETENTE') or '').strip()
+        senha_app = str(os.getenv('EMAIL_SENHA_APP') or '').replace(' ', '')
+        if not remetente or not senha_app:
+            return {'erro': 'Envio de e-mail não configurado.'}, 503
         try:
-            remetente = os.getenv("EMAIL_REMETENTE")
-            senha_app = os.getenv("EMAIL_SENHA_APP")
-
-            if not remetente or not senha_app:
-                return {"erro": "Credenciais de e-mail não configuradas no servidor (.env)"}, 500
-
             msg = EmailMessage()
-            msg["Subject"] = "RotaFácil - Redefinição de senha"
-            msg["From"] = remetente
-            msg["To"] = destinatario
-            msg.set_content(
-                f"Você solicitou a redefinição de senha no RotaFácil.\n\n"
-                f"Use o código abaixo para redefinir sua senha (válido por 30 minutos):\n\n"
-                f"{token}\n\n"
-                f"Se você não solicitou isso, ignore este e-mail."
-            )
-
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as servidor:
+            msg['Subject'] = assunto
+            msg['From'] = f'RotaFácil <{remetente}>'
+            msg['To'] = destinatario
+            msg.set_content(mensagem)
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as servidor:
                 servidor.login(remetente, senha_app)
                 servidor.send_message(msg)
+            return {'mensagem': 'E-mail enviado.'}, 200
+        except (smtplib.SMTPException, OSError, ValueError):
+            return {'erro': 'Não foi possível enviar o e-mail. Tente novamente mais tarde.'}, 503
 
-            return {"mensagem": "E-mail de redefinição enviado com sucesso!"}, 200
+    @staticmethod
+    def enviar_email_redefinicao(destinatario, token):
+        return Notificacoes._enviar_email(
+            destinatario, 'RotaFácil - Recuperação de senha',
+            'Você solicitou a recuperação de senha no RotaFácil.\n\n'
+            f'Copie o código abaixo e informe-o na tela Recuperar senha:\n\n{token}\n\n'
+            'Este código é pessoal, de uso único e expira em 30 minutos.\n'
+            'Se não foi você, ignore esta mensagem. Sua senha não foi alterada.')
 
-        except smtplib.SMTPAuthenticationError:
-            return {"erro": "Falha na autenticação com o servidor de e-mail. Verifique a senha de app."}, 500
-        except Exception as e:
-            return {"erro": f"Erro ao enviar e-mail: {str(e)}"}, 500
+    @staticmethod
+    def enviar_email_confirmacao(destinatario, token):
+        return Notificacoes._enviar_email(
+            destinatario, 'RotaFácil - Confirme seu e-mail',
+            'Confirme seu endereço de e-mail no RotaFácil.\n\n'
+            f'Copie o código abaixo e informe-o na tela Confirmar e-mail:\n\n{token}\n\n'
+            'Este código é pessoal, de uso único e expira em 30 minutos.\n'
+            'A confirmação de e-mail não substitui a análise profissional de guia ou agência.\n'
+            'Se não foi você, ignore esta mensagem.')
 
     # --- Push (FCM) ---
     @staticmethod

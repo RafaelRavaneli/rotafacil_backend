@@ -11,13 +11,14 @@ load_dotenv()
 
 class Autenticacao:
     @staticmethod
-    def make_token(email, usuario_id, tipo_perfil):
+    def make_token(email, usuario_id, tipo_perfil, versao_auth=0):
         key = os.getenv("KEY")
         # Inserindo o ID e o Tipo (papel) dentro do token JWT
         payload = {
             'email': email,
             'id': usuario_id,
             'tipo': tipo_perfil,
+            'versao_auth': versao_auth,
             'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=2)
         }
         token = jwt.encode(payload, key, algorithm='HS256')
@@ -49,6 +50,10 @@ class Autenticacao:
                 return {"erro": "Credenciais inválidas"}, 401
 
             if check_password_hash(senha_salva_no_banco, senha_recebida):
+                if (usuario_dados.get('exigir_confirmacao_email', False) and
+                        not usuario_dados.get('email_confirmado', False)):
+                    return {'erro': 'Confirme seu e-mail antes de entrar.',
+                            'codigo': 'EMAIL_NAO_CONFIRMADO'}, 403
                 nome_do_usuario = usuario_dados.get('nome', 'Usuário')
                 
                 # Pegando o ID e o TIPO do banco para mandar para o gerador de token
@@ -56,7 +61,7 @@ class Autenticacao:
                 tipo_perfil = usuario_dados.get('tipo', 'usuario')
 
                 # Atualizamos a chamada para passar os 3 argumentos
-                token = Autenticacao.make_token(email_recebido, usuario_id, tipo_perfil)
+                token = Autenticacao.make_token(email_recebido, usuario_id, tipo_perfil, usuario_dados.get('versao_auth', 0))
 
                 return {
                     "mensagem": "Autenticação bem-sucedida",
@@ -128,6 +133,8 @@ def token_obrigatorio(f):
                 return jsonify({"erro": "Usuário não encontrado."}), 401
 
             usuario_atual = docs[0].to_dict()
+            if dados_token.get('versao_auth', 0) != usuario_atual.get('versao_auth', 0):
+                return jsonify({'erro': 'Sua senha foi redefinida. Entre novamente.'}), 401
             usuario_atual["id"] = docs[0].id
             usuario_atual.pop("senha", None)
         except jwt.ExpiredSignatureError:

@@ -189,5 +189,20 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(status, 409)
         self.db.collection.return_value.document.return_value.set.assert_not_called()
 
+    @patch.dict(os.environ, {'KEY': 'email-version-key-only-' * 3})
+    def test_senha_redefinida_rejeita_jwt_anterior(self):
+        doc = MagicMock()
+        doc.exists = True
+        doc.id = 'u1'
+        doc.to_dict.return_value = {'id': 'u1', 'email': 'u@example.test', 'tipo': 'usuario', 'versao_auth': 1}
+        self.db.collection.return_value.document.return_value.get.return_value = doc
+        token_antigo = Autenticacao.make_token('u@example.test', 'u1', 'usuario', 0)
+        token_novo = Autenticacao.make_token('u@example.test', 'u1', 'usuario', 1)
+        with patch('services.autenticacao.firestore.client', return_value=self.db), patch('routes.usuarios_routes.bd', self.db):
+            response = self.client.get('/api/usuarios/u1', headers={'Authorization': f'Bearer {token_antigo}'})
+            self.assertEqual(response.status_code, 401)
+            response = self.client.get('/api/usuarios/u1', headers={'Authorization': f'Bearer {token_novo}'})
+            self.assertEqual(response.status_code, 200)
+
 if __name__ == '__main__':
     unittest.main()

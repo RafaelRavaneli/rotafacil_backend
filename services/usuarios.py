@@ -1,3 +1,4 @@
+from services.verificacao_email import VerificacaoEmail
 import re
 import os
 import uuid
@@ -153,6 +154,7 @@ class Usuarios:
             ('notificacoes', 'id_usuario'),
             ('disponibilidades', 'id_usuario'),
             ('redefinicoes_senha', 'id_usuario'),
+            ('verificacoes_email', 'id_usuario'),
             ('convites_guias', 'id_guia'),
             ('convites_guias', 'id_agencia'),
         ):
@@ -299,12 +301,24 @@ class Usuarios:
                 "contato_emergencia_nome": dados.get("contato_emergencia_nome"),
                 "contato_emergencia_telefone": dados.get("contato_emergencia_telefone"),
                 "verificado": False,
+                "email_confirmado": False,
+                "exigir_confirmacao_email": VerificacaoEmail.habilitada(),
                 "ativo": True,
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
 
             db.collection('usuarios').document(id_usuario).set(usuario)
-            return {"mensagem": "Usuário cadastrado com sucesso!", "id": id_usuario}, 201
+            enviada = False
+            if usuario['exigir_confirmacao_email']:
+                try:
+                    _, envio_status = VerificacaoEmail.solicitar(db, {'email': email})
+                    enviada = envio_status == 200
+                except Exception:
+                    # Conta criada: falha no envio deve permitir reenvio, sem novo cadastro.
+                    enviada = False
+            return {"mensagem": "Usuário cadastrado com sucesso!", "id": id_usuario,
+                    "confirmacao_email_necessaria": usuario['exigir_confirmacao_email'],
+                    "confirmacao_email_enviada": enviada}, 201
         except Exception as e:
             return {"erro": f"Ocorreu um erro ao salvar: {str(e)}"}, 500
 
@@ -418,6 +432,8 @@ class Usuarios:
             if ("email" in dados and
                     not Usuarios._email_disponivel(db, dados['email'], doc_id)):
                 return {"erro": "Email já cadastrado"}, 409
+            if 'email' in dados and dados['email'] != atual.get('email'):
+                dados.update({'email_confirmado': False, 'email_confirmado_em': None})
             db.collection('usuarios').document(doc_id).update(dados)
             return {"mensagem": "Usuário atualizado com sucesso!"}, 200
         except Exception as e:
@@ -469,6 +485,8 @@ class Usuarios:
             if ("email" in dados and
                     not Usuarios._email_disponivel(db, dados['email'], id)):
                 return {"erro": "Email já cadastrado"}, 409
+            if 'email' in dados and dados['email'] != atual.get('email'):
+                dados.update({'email_confirmado': False, 'email_confirmado_em': None})
             db.collection('usuarios').document(id).update(dados)
             return {"mensagem": "Usuário atualizado com sucesso!"}, 200
         except Exception as e:
