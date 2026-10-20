@@ -11,7 +11,6 @@ from services.community import Community, CommunityError, PushDevices
 from services.agendamentos import Agendamentos
 from services.trilhas import Trilhas
 from services.usuarios import Usuarios
-from services.disponibilidades import Disponibilidades
 from services.documentos_profissionais import DocumentosProfissionais
 from services.avaliacoes import Avaliacoes
 from services.uploads import Uploads
@@ -393,9 +392,10 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(roteiro['horario_fim'],'15:00')
         invalido={**dados,'data_hora_fim':'2099-06-10T22:00:00'}
         self.assertEqual(Trilhas.cadastrar_trilha(self.db,invalido,self.g)[1],400)
-        Disponibilidades.criar(self.db,self.g,{
-            'data':'2099-07-11','horario_inicio':'10:00',
-            'horario_fim':'16:00','tipo':'bloqueio'})
+        self.db.collection('trilhas').document('ocupado').set({
+            'nome':'Outro roteiro','id_guia':'g','ativo':True,
+            'data_hora_inicio':'2099-07-11T10:00',
+            'data_hora_fim':'2099-07-11T16:00'})
         conflito={
             **dados,'data_atividade':'2099-07-10','data_fim':'2099-07-11',
             'data_hora_inicio':'2099-07-10T23:00:00',
@@ -658,27 +658,34 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(len(self.db.collection('disponibilidades').stream()),0)
         self.assertEqual(len(self.db.collection('convites_guias').stream()),0)
 
-    def test_disponibilidade_valida_conflito_e_remocao(self):
-        dados={'data':'2099-02-10','horario_inicio':'08:00',
-               'horario_fim':'12:00','tipo':'disponivel','capacidade':8}
-        item,status=Disponibilidades.criar(self.db,self.g,dados)
-        self.assertEqual(status,201,item)
-        self.assertEqual(Disponibilidades.criar(
-            self.db,self.g,{**dados,'horario_inicio':'10:00','horario_fim':'13:00'})[1],409)
-        rows,status=Disponibilidades.listar(self.db,self.g)
-        self.assertEqual(status,200);self.assertEqual([row['id'] for row in rows],[item['id']])
-        self.assertEqual(Disponibilidades.excluir(self.db,self.x,item['id'])[1],403)
-        self.assertEqual(Disponibilidades.excluir(self.db,self.g,item['id'])[1],200)
+    def test_conflito_entre_roteiros_permanece_sem_disponibilidade(self):
+        dados={'nome':'Primeiro roteiro','descricao':'Percurso','dificuldade':'Iniciante',
+               'data_atividade':'2099-02-10','horario_inicio':'08:00',
+               'horario_fim':'12:00','capacidade':10}
+        primeiro,status=Trilhas.cadastrar_trilha(self.db,dados,self.g)
+        self.assertEqual(status,201,primeiro)
+        conflito={**dados,'nome':'Conflitante','horario_inicio':'09:00',
+                  'horario_fim':'11:00'}
+        self.assertEqual(Trilhas.cadastrar_trilha(self.db,conflito,self.g)[1],409)
+        seguinte={**dados,'nome':'Após primeiro','horario_inicio':'12:00',
+                  'horario_fim':'14:00'}
+        segundo,status=Trilhas.cadastrar_trilha(self.db,seguinte,self.g)
+        self.assertEqual(status,201,segundo)
+        self.assertEqual(Trilhas.atualizar_trilha(self.db,segundo['id'],{
+            'datas':[{'data_hora_inicio':'2099-02-10T11:00',
+                      'data_hora_fim':'2099-02-10T14:00'}]},self.g)[1],409)
+        self.assertEqual(Trilhas.atualizar_trilha(self.db,primeiro['id'],{
+            'nome':'Mesmo roteiro atualizado'},self.g)[1],200)
 
-    def test_bloqueio_impede_atividade_no_mesmo_horario(self):
-        bloqueio={'data':'2099-02-10','horario_inicio':'08:00',
-                  'horario_fim':'12:00','tipo':'bloqueio'}
-        self.assertEqual(Disponibilidades.criar(self.db,self.g,bloqueio)[1],201)
-        trilha={'nome':'Trilha','descricao':'Percurso','dificuldade':'Fácil',
-                'data_atividade':'2099-02-10','horario_inicio':'09:00',
-                'horario_fim':'11:00','capacidade':10}
-        result,status=Trilhas.cadastrar_trilha(self.db,trilha,self.g)
-        self.assertEqual(status,409,result)
+    def test_bloqueios_legados_nao_impedem_roteiros(self):
+        self.db.collection('disponibilidades').document('legado').set({
+            'id_usuario':'g','data':'2099-02-10','horario_inicio':'08:00',
+            'horario_fim':'12:00','tipo':'bloqueio'})
+        dados={'nome':'Roteiro','descricao':'Percurso','dificuldade':'Iniciante',
+               'data_atividade':'2099-02-10','horario_inicio':'09:00',
+               'horario_fim':'11:00','capacidade':10}
+        result,status=Trilhas.cadastrar_trilha(self.db,dados,self.g)
+        self.assertEqual(status,201,result)
 
     def test_avaliacao_valida_comentario_e_exige_conclusao(self):
         self.db.collection('trilhas').document('t1').set({'nome':'Trilha'})

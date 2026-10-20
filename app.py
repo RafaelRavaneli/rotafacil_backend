@@ -11,7 +11,6 @@ from routes.uploads_routes import uploads_bp
 from routes.redefinicao_senha_routes import redefinicao_senha_bp
 from routes.favoritos_routes import favoritos_bp
 from routes.avaliacoes_routes import avaliacoes_bp
-from routes.disponibilidades_routes import disponibilidades_bp
 from routes.documentos_profissionais_routes import documentos_profissionais_bp
 from routes.notificacoes_routes import notificacoes_bp
 from services.agendador import iniciar_agendador
@@ -38,7 +37,6 @@ app.register_blueprint(uploads_bp, url_prefix='/api/uploads')
 app.register_blueprint(redefinicao_senha_bp, url_prefix='/api/auth/senha')
 app.register_blueprint(favoritos_bp, url_prefix='/api/favoritos')
 app.register_blueprint(avaliacoes_bp, url_prefix='/api/avaliacoes')
-app.register_blueprint(disponibilidades_bp, url_prefix='/api/disponibilidades')
 app.register_blueprint(
     documentos_profissionais_bp,
     url_prefix='/api/documentos-profissionais')

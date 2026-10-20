@@ -1,5 +1,4 @@
 from services.community import Community
-from services.disponibilidades import Disponibilidades
 import uuid
 import math
 from datetime import date, datetime
@@ -8,6 +7,13 @@ from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 class Trilhas:
+    @staticmethod
+    def _hora(valor, campo):
+        try:
+            return datetime.strptime(str(valor or ''), '%H:%M').time()
+        except ValueError as exc:
+            raise ValueError(f'{campo} deve estar no formato HH:MM.') from exc
+
     CAMPOS_EDITAVEIS = {
         'nome', 'descricao', 'dificuldade', 'modalidade', 'distancia_km',
         'cidade', 'estado', 'data_atividade', 'latitude', 'longitude',
@@ -198,10 +204,10 @@ class Trilhas:
                 raise ValueError('Informe data e hora de início e fim do roteiro.')
             try:
                 inicio_dt = datetime.fromisoformat(
-                    f"{data_inicio}T{Disponibilidades._hora(inicio, 'horario_inicio').strftime('%H:%M')}"
+                    f"{data_inicio}T{Trilhas._hora(inicio, 'horario_inicio').strftime('%H:%M')}"
                 )
                 fim_dt = datetime.fromisoformat(
-                    f"{data_fim}T{Disponibilidades._hora(fim, 'horario_fim').strftime('%H:%M')}"
+                    f"{data_fim}T{Trilhas._hora(fim, 'horario_fim').strftime('%H:%M')}"
                 )
             except ValueError as exc:
                 raise ValueError('Data e hora do roteiro são inválidas.') from exc
@@ -223,14 +229,6 @@ class Trilhas:
             return False
         inicio_dt = datetime.fromisoformat(inicio_iso)
         fim_dt = datetime.fromisoformat(fim_iso)
-        dia = inicio_dt.date()
-        while dia <= fim_dt.date():
-            inicio_dia = inicio_dt.strftime('%H:%M') if dia == inicio_dt.date() else '00:00'
-            fim_dia = fim_dt.strftime('%H:%M') if dia == fim_dt.date() else '23:59'
-            if Disponibilidades.conflito_bloqueio(
-                    db, guia_id, dia.isoformat(), inicio_dia, fim_dia):
-                return True
-            dia = date.fromordinal(dia.toordinal() + 1)
         for doc in db.collection('trilhas').where('id_guia', '==', guia_id).stream():
             if doc.id == ignorar:
                 continue
@@ -446,7 +444,7 @@ class Trilhas:
             if any(Trilhas._conflito_agenda(
                     db, guia_responsavel, item['data_hora_inicio'],
                     item['data_hora_fim']) for item in datas):
-                return {"erro": "O responsável já possui atividade ou bloqueio neste horário."}, 409
+                return {"erro": "O responsável já possui outro roteiro neste horário."}, 409
             trilha = {
                 "id": id_trilha,
                 "nome": dados.get("nome"),
@@ -589,7 +587,7 @@ class Trilhas:
             if any(Trilhas._conflito_agenda(
                     db, combinado.get('id_guia'), item['data_hora_inicio'],
                     item['data_hora_fim'], ignorar=id_trilha) for item in datas):
-                return {"erro": "O responsável já possui atividade ou bloqueio neste horário."}, 409
+                return {"erro": "O responsável já possui outro roteiro neste horário."}, 409
             doc_ref.update(dados)
             return {"mensagem": "Roteiro atualizado com sucesso!"}, 200
         except Exception as e:
