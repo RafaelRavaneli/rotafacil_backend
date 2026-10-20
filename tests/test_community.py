@@ -515,6 +515,7 @@ class CommunityTests(unittest.TestCase):
                 self.db,{**dados,'id_usuario':'x'})[1],409)
 
     def test_agencia_lista_somente_reservas_das_proprias_trilhas(self):
+        self.db.collection('usuarios').document('t').update({'telefone': '44999990000'})
         self.db.collection('trilhas').document('t1').set(
             {'nome':'Própria','criado_por':'a@example.test','id_guia':'g'})
         self.db.collection('trilhas').document('t2').set(
@@ -527,6 +528,7 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(status,200)
         self.assertEqual([row['id'] for row in rows],['b1'])
         self.assertEqual(rows[0]['nome_usuario'],'t')
+        self.assertEqual(rows[0]['telefone_participante'],'44999990000')
         self.assertEqual(rows[0]['nome_trilha'],'Própria')
         self.assertEqual(Agendamentos.cancelar_agendamento(
             self.db,'b1',self.a)[1],200)

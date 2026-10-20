@@ -31,11 +31,13 @@ class Agendamentos:
         trilha_id = item.get('id_trilha')
         if usuario_id and usuario_id not in usuarios:
             doc = db.collection('usuarios').document(usuario_id).get()
-            usuarios[usuario_id] = (doc.to_dict() or {}).get('nome') if doc.exists else None
+            usuarios[usuario_id] = (doc.to_dict() or {}) if doc.exists else {}
         if trilha_id and trilha_id not in trilhas:
             doc = db.collection('trilhas').document(trilha_id).get()
             trilhas[trilha_id] = (doc.to_dict() or {}) if doc.exists else {}
-        item['nome_usuario'] = usuarios.get(usuario_id)
+        participante = usuarios.get(usuario_id) or {}
+        item['nome_usuario'] = participante.get('nome')
+        item['telefone_participante'] = participante.get('telefone')
         dados_trilha = trilhas.get(trilha_id) or {}
         item['nome_trilha'] = dados_trilha.get('nome')
         guia_id, guia = Agendamentos._usuario_por_identificador(
