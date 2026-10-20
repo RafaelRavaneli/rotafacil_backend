@@ -229,7 +229,8 @@ class CommunityTests(unittest.TestCase):
             'status':'agendado'})
         result,status=Agendamentos.fazer_checkin(self.db,'b1',self.t)
         self.assertEqual(status,403,result)
-        result,status=Agendamentos.fazer_checkin(self.db,'b1',self.g)
+        self.assertEqual(Agendamentos.fazer_checkin(self.db,'b1',self.g)[1],403)
+        result,status=Agendamentos.fazer_checkin(self.db,'b1',self.a)
         self.assertEqual(status,200,result)
         result,status=Agendamentos.fazer_checkout(self.db,'b1',self.t)
         self.assertEqual(status,403,result)
@@ -451,7 +452,47 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(status,200)
         self.assertEqual([item['id'] for item in guia],['ativa','cancelada'])
 
-    def test_guia_confirma_e_finaliza_saida_liberando_avaliacao_completa(self):
+    def test_agencia_controla_reservas_contatos_e_gestao_sem_acesso_do_guia(self):
+        self.db.collection('usuarios').document('a').update({'telefone':'44988880000'})
+        self.db.collection('usuarios').document('g').update({'telefone':'44977770000'})
+        self.db.collection('trilhas').document('t1').set({
+            'nome':'Roteiro da agência','id_guia':'g','criado_por':'a@example.test',
+            'ativo':True,'preco':120,'capacidade':10})
+        self.db.collection('agendamentos').document('b1').set({
+            'id':'b1','id_usuario':'t','id_trilha':'t1','id_guia':'g',
+            'id_data':'d1','status':'pendente'})
+        for resposta in ('confirmado','recusado'):
+            self.assertEqual(Agendamentos.responder_agendamento(self.db,'b1',self.g,resposta)[1],403)
+        self.assertEqual(Agendamentos.cancelar_agendamento(self.db,'b1',self.g)[1],403)
+        self.assertEqual(Agendamentos.finalizar_saida(self.db,'t1','d1',None,self.g)[1],403)
+        self.assertEqual(Trilhas.atualizar_trilha(self.db,'t1',{'nome':'Alterado'},self.g)[1],403)
+        self.assertEqual(Trilhas.deletar_trilha(self.db,'t1',self.g)[1],403)
+        self.assertEqual(Usuarios.obter_contato_emergencia(self.db,'t',self.g)[1],403)
+        self.assertEqual(Agendamentos.listar_agendamentos_guia(self.db,'g')[0],[])
+        self.assertEqual(Agendamentos.dashboard_guia(self.db,'g')[0]['total_agendamentos'],0)
+        reservas,status=Agendamentos.listar_agendamentos_agencia(self.db,self.a)
+        self.assertEqual(status,200,reservas)
+        self.assertEqual(reservas[0]['telefone_agencia'],'44988880000')
+        self.assertEqual(reservas[0]['id_agencia'],'a')
+        with patch('services.agendamentos.Notificacoes.notificar_usuario') as notify:
+            result,status=Agendamentos.agendar_trilha(self.db,{
+                'id_usuario':'x','id_trilha':'t1','data_agendada':'2099-12-01'})
+            self.assertEqual(status,201,result)
+            self.assertEqual(notify.call_args.args[1],'a')
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            self.assertEqual(Agendamentos.responder_agendamento(self.db,'b1',self.a,'confirmado')[1],200)
+        self.assertEqual(Trilhas.buscar_trilha_por_id(self.db,'t1')[1],200)
+
+    def test_guia_mantem_gestao_de_reserva_do_proprio_roteiro(self):
+        self.db.collection('trilhas').document('proprio').set({
+            'nome':'Próprio','id_guia':'g','criado_por':'g@example.test'})
+        self.db.collection('agendamentos').document('propria').set({
+            'id':'propria','id_usuario':'t','id_trilha':'proprio','id_guia':'g','status':'pendente'})
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            self.assertEqual(Agendamentos.responder_agendamento(self.db,'propria',self.g,'confirmado')[1],200)
+        self.assertEqual(len(Agendamentos.listar_agendamentos_guia(self.db,'g')[0]),1)
+
+    def test_agencia_confirma_e_finaliza_saida_liberando_avaliacao_completa(self):
         self.db.collection('trilhas').document('t1').set({
             'nome':'Roteiro','id_guia':'g','criado_por':'a@example.test',
             'datas':[{'id':'d1','data_hora_inicio':'2026-10-10T08:00',
@@ -463,7 +504,7 @@ class CommunityTests(unittest.TestCase):
             self.db,'b1',self.t,'confirmado')[1],403)
         with patch('services.agendamentos.Notificacoes.notificar_usuario'):
             result,status=Agendamentos.responder_agendamento(
-                self.db,'b1',self.g,'confirmado')
+                self.db,'b1',self.a,'confirmado')
         self.assertEqual(status,200,result)
         self.assertEqual(self.db.collection('agendamentos').document(
             'b1').get().to_dict()['status'],'confirmado')
@@ -545,7 +586,8 @@ class CommunityTests(unittest.TestCase):
             'id_usuario':'t','id_trilha':'t1','id_guia':'g','status':'concluido'})
         self.assertEqual(Usuarios.obter_contato_emergencia(self.db,'t',self.g)[1],403)
         self.db.collection('agendamentos').document('b1').update({'status':'em_andamento'})
-        for solicitante in (self.g,self.a):
+        self.assertEqual(Usuarios.obter_contato_emergencia(self.db,'t',self.g)[1],403)
+        for solicitante in (self.a,):
             result,status=Usuarios.obter_contato_emergencia(self.db,'t',solicitante)
             self.assertEqual(status,200,result)
             self.assertEqual(result['contato_emergencia_nome'],'Maria')

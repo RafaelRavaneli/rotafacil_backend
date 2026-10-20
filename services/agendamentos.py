@@ -2,6 +2,7 @@ import uuid
 from datetime import date
 from firebase_admin import firestore
 from services.notificacoes import Notificacoes
+from services.trilhas import Trilhas
 
 class Agendamentos:
     STATUS_ATIVOS = {'agendado', 'pendente', 'confirmado', 'em_andamento'}
@@ -50,6 +51,7 @@ class Agendamentos:
         if str(agencia.get('tipo') or '').strip().lower() == 'agencia':
             item['id_agencia'] = agencia_id
             item['nome_agencia'] = agencia.get('nome')
+            item['telefone_agencia'] = agencia.get('telefone')
         item['avaliado'] = bool(item.get('id') and db.collection(
             'avaliacoes').document(str(item.get('id'))).get().exists)
         for campo in ('createdAt', 'cancelado_em'):
@@ -73,39 +75,32 @@ class Agendamentos:
 
     @staticmethod
     def _usuario_pode_gerenciar_agendamento(db, dados_agendamento, usuario_atual):
-        papel = (usuario_atual.get('tipo') or '').strip().lower()
-        usuario_id = usuario_atual.get('id')
-        eh_admin = papel == 'admin'
-        eh_dono = usuario_id == dados_agendamento.get('id_usuario')
-        eh_guia_responsavel = dados_agendamento.get('id_guia') in {usuario_id, usuario_atual.get('email')} - {None, ''}
-        eh_agencia_proprietaria = False
-        if papel == 'agencia':
-            trilha = db.collection('trilhas').document(
-                dados_agendamento.get('id_trilha')).get()
-            aliases = {usuario_id, usuario_atual.get('email')} - {None, ''}
-            eh_agencia_proprietaria = (
-                trilha.exists and
-                (trilha.to_dict() or {}).get('criado_por') in aliases
-            )
-        return (eh_admin or eh_dono or eh_guia_responsavel or
-                eh_agencia_proprietaria)
+        return (usuario_atual.get('id') == dados_agendamento.get('id_usuario') or
+                Agendamentos._usuario_pode_operar_agendamento(db, dados_agendamento, usuario_atual))
 
     @staticmethod
     def _usuario_pode_operar_agendamento(db, dados_agendamento, usuario_atual):
         papel = (usuario_atual.get('tipo') or '').strip().lower()
-        usuario_id = usuario_atual.get('id')
         if papel == 'admin':
             return True
-        if papel == 'guia':
-            aliases = {usuario_id, usuario_atual.get('email')} - {None, ''}
-            return dados_agendamento.get('id_guia') in aliases
-        if papel == 'agencia':
-            trilha = db.collection('trilhas').document(
-                dados_agendamento.get('id_trilha')).get()
-            aliases = {usuario_id, usuario_atual.get('email')} - {None, ''}
-            return (trilha.exists and
-                    (trilha.to_dict() or {}).get('criado_por') in aliases)
-        return False
+        if papel not in {'guia', 'agencia'}:
+            return False
+        trilha_id = dados_agendamento.get('id_trilha')
+        trilha = db.collection('trilhas').document(trilha_id).get() if trilha_id else None
+        if trilha is not None and trilha.exists:
+            dados_trilha = trilha.to_dict() or {}
+            if not dados_trilha.get('id_guia'):
+                dados_trilha['id_guia'] = dados_agendamento.get('id_guia')
+            return Trilhas._usuario_pode_gerenciar_trilha(dados_trilha, usuario_atual)
+        # Reservas históricas sem roteiro preservam gestão do guia original.
+        return (papel == 'guia' and dados_agendamento.get('id_guia') in
+                {usuario_atual.get('id'), usuario_atual.get('email')} - {None, ''})
+
+    @staticmethod
+    def _contato_operacao(db, trilha):
+        identifier, user = Agendamentos._usuario_por_identificador(
+            db, trilha.get('criado_por') or trilha.get('id_guia'))
+        return identifier or trilha.get('criado_por') or trilha.get('id_guia'), user
 
     @staticmethod
     def agendar_trilha(db, dados):
@@ -190,8 +185,9 @@ class Agendamentos:
 
             db.collection('agendamentos').document(id_agendamento).set(agendamento)
 
+            contato_id, _ = Agendamentos._contato_operacao(db, dados_trilha)
             Notificacoes.notificar_usuario(
-                db, id_guia,
+                db, contato_id,
                 "Novo agendamento recebido!",
                 f"Você recebeu um novo agendamento para o roteiro '{dados_trilha.get('nome')}'.",
                 dados={"tipo": "novo_agendamento", "id_agendamento": id_agendamento}
@@ -232,6 +228,10 @@ class Agendamentos:
             for alias in Agendamentos._identificadores_guia(db, id_guia):
                 for doc in db.collection('agendamentos').where('id_guia', '==', alias).stream():
                     rows[doc.id] = doc.to_dict()
+            user_id, guide = Agendamentos._usuario_por_identificador(db, id_guia)
+            guide = {**guide, 'id': user_id or id_guia, 'tipo': 'guia'}
+            rows = {key: value for key, value in rows.items()
+                    if Agendamentos._usuario_pode_operar_agendamento(db, value, guide)}
             usuarios, trilhas = {}, {}
             lista = [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()]
             return Agendamentos._ordenar_para_exibicao(lista), 200
@@ -294,6 +294,8 @@ class Agendamentos:
 
             trilha_doc = db.collection('trilhas').document(dados.get('id_trilha')).get()
             nome_trilha = trilha_doc.to_dict().get('nome') if trilha_doc.exists else 'um roteiro'
+            if trilha_doc.exists:
+                id_guia_agendamento, _ = Agendamentos._contato_operacao(db, trilha_doc.to_dict() or {})
 
             if quem_cancelou == id_usuario_agendamento:
                 Notificacoes.notificar_usuario(
@@ -464,6 +466,11 @@ class Agendamentos:
                 for doc in db.collection('agendamentos').where(
                         'id_guia', '==', alias).stream():
                     rows[doc.id] = doc.to_dict()
+        if role != 'agencia':
+            guide = {**((user.to_dict() or {}) if user.exists else {}),
+                     'id': id_guia, 'tipo': 'guia'}
+            rows = {key: value for key, value in rows.items()
+                    if Agendamentos._usuario_pode_operar_agendamento(db, value, guide)}
         counts = {key: 0 for key in (
             'pendente', 'agendado', 'confirmado', 'em_andamento',
             'concluido', 'cancelado', 'outros')}

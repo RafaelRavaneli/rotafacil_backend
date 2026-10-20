@@ -618,21 +618,13 @@ class Usuarios:
             if papel_solicitante != 'admin':
                 agendamentos_ref = db.collection('agendamentos') \
                     .where('id_usuario', '==', id_usuario).stream()
-                aliases = {id_solicitante, usuario_solicitante.get('email')} - {None, ''}
-                tem_agendamento_ativo = False
-                for doc in agendamentos_ref:
-                    agendamento = doc.to_dict() or {}
-                    status = str(agendamento.get('status') or '').strip().lower()
-                    if status not in {'agendado', 'pendente', 'confirmado', 'em_andamento'}:
-                        continue
-                    if papel_solicitante == 'guia' and agendamento.get('id_guia') in aliases:
-                        tem_agendamento_ativo = True
-                        break
-                    if papel_solicitante == 'agencia':
-                        trilha = db.collection('trilhas').document(agendamento.get('id_trilha')).get()
-                        if trilha.exists and (trilha.to_dict() or {}).get('criado_por') in aliases:
-                            tem_agendamento_ativo = True
-                            break
+                from services.agendamentos import Agendamentos
+                tem_agendamento_ativo = any(
+                    str((doc.to_dict() or {}).get('status') or '').strip().lower()
+                    in {'agendado', 'pendente', 'confirmado', 'em_andamento'} and
+                    Agendamentos._usuario_pode_operar_agendamento(
+                        db, doc.to_dict() or {}, usuario_solicitante)
+                    for doc in agendamentos_ref)
                 if not tem_agendamento_ativo:
                     return {"erro": "Você só pode ver o contato de emergência de participantes com agendamento ativo em seus roteiros."}, 403
 
