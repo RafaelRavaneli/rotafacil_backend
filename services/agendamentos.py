@@ -25,7 +25,24 @@ class Agendamentos:
             trilhas[trilha_id] = (doc.to_dict() or {}).get('nome') if doc.exists else None
         item['nome_usuario'] = usuarios.get(usuario_id)
         item['nome_trilha'] = trilhas.get(trilha_id)
+        for campo in ('createdAt', 'cancelado_em'):
+            valor = item.get(campo)
+            if hasattr(valor, 'isoformat'):
+                item[campo] = valor.isoformat()
         return item
+
+    @staticmethod
+    def _ordenar_para_exibicao(lista):
+        """Exibe reservas ativas primeiro e as mais recentes no topo."""
+        def criada_em(item):
+            valor = item.get('createdAt')
+            return valor.isoformat() if hasattr(valor, 'isoformat') else str(valor or '')
+
+        ativas = [item for item in lista if Agendamentos._status_ativo(item.get('status'))]
+        historico = [item for item in lista if not Agendamentos._status_ativo(item.get('status'))]
+        ativas.sort(key=criada_em, reverse=True)
+        historico.sort(key=criada_em, reverse=True)
+        return ativas + historico
 
     @staticmethod
     def _usuario_pode_gerenciar_agendamento(db, dados_agendamento, usuario_atual):
@@ -163,7 +180,7 @@ class Agendamentos:
             ref = db.collection('agendamentos').where('id_usuario', '==', id_usuario).stream()
             usuarios, trilhas = {}, {}
             lista = [Agendamentos._serializar(db, doc.to_dict(), usuarios, trilhas) for doc in ref]
-            return lista, 200
+            return Agendamentos._ordenar_para_exibicao(lista), 200
         except Exception as e:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
 
@@ -189,7 +206,8 @@ class Agendamentos:
                 for doc in db.collection('agendamentos').where('id_guia', '==', alias).stream():
                     rows[doc.id] = doc.to_dict()
             usuarios, trilhas = {}, {}
-            return [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()], 200
+            lista = [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()]
+            return Agendamentos._ordenar_para_exibicao(lista), 200
         except Exception as e:
             return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
 
@@ -213,7 +231,8 @@ class Agendamentos:
                 for doc in db.collection('agendamentos').where('id_trilha', '==', trilha_id).stream():
                     rows[doc.id] = doc.to_dict()
             usuarios, trilhas = {}, {}
-            return [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()], 200
+            lista = [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()]
+            return Agendamentos._ordenar_para_exibicao(lista), 200
         except Exception as e:
             return {"erro": f"Erro ao buscar agendamentos da agência: {str(e)}"}, 500
 
@@ -236,7 +255,11 @@ class Agendamentos:
                     "erro": "Somente reservas ainda não iniciadas podem ser canceladas."
                 }, 409
 
-            doc_ref.update({"status": "cancelado"})
+            doc_ref.update({
+                "status": "cancelado",
+                "cancelado_em": firestore.SERVER_TIMESTAMP,
+                "cancelado_por": usuario_atual.get('id'),
+            })
 
             quem_cancelou = usuario_atual.get('id')
             id_usuario_agendamento = dados.get('id_usuario')

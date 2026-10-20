@@ -424,6 +424,7 @@ class CommunityTests(unittest.TestCase):
                 'id_data':'saida-2','data_agendada':'2099-01-01'})
         self.assertEqual(status,201,reserva)
         salva=self.db.collection('agendamentos').document(reserva['id']).get().to_dict()
+        self.assertEqual(salva['status'],'agendado')
         self.assertEqual(salva['id_data'],'saida-2')
         self.assertEqual(salva['data_agendada'],'2099-09-12')
         self.assertEqual(salva['data_hora_inicio'],'2099-09-12T07:00')
@@ -432,6 +433,23 @@ class CommunityTests(unittest.TestCase):
                 'id_usuario':'t','id_trilha':result['id'],
                 'id_data':'saida-1','data_agendada':'2099-01-01'})
         self.assertEqual(status,201,segunda)
+
+    def test_listagem_mostra_reserva_ativa_antes_do_historico_cancelado(self):
+        self.db.collection('trilhas').document('t1').set({
+            'nome':'Roteiro','id_guia':'g'})
+        self.db.collection('agendamentos').document('cancelada').set({
+            'id':'cancelada','id_usuario':'t','id_trilha':'t1','id_guia':'g',
+            'status':'cancelado','createdAt':'2099-10-20T10:00:00'})
+        self.db.collection('agendamentos').document('ativa').set({
+            'id':'ativa','id_usuario':'t','id_trilha':'t1','id_guia':'g',
+            'status':'agendado','createdAt':'2099-10-20T09:00:00'})
+
+        usuario,status=Agendamentos.listar_agendamentos_usuario(self.db,'t')
+        self.assertEqual(status,200)
+        self.assertEqual([item['id'] for item in usuario],['ativa','cancelada'])
+        guia,status=Agendamentos.listar_agendamentos_guia(self.db,'g')
+        self.assertEqual(status,200)
+        self.assertEqual([item['id'] for item in guia],['ativa','cancelada'])
 
     def test_reserva_usa_preco_do_servidor_bloqueia_duplicidade_e_lotacao(self):
         self.db.collection('trilhas').document('t1').set({
