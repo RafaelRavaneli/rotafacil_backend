@@ -123,6 +123,43 @@ class CommunityTests(unittest.TestCase):
         for key in ('senha','email','documento'): self.assertNotIn(key,detail)
         self.denied(404,Community.guide,self.db,'a')
         self.denied(400,Community.invite,self.db,self.a,{'id_guia':'g/x'})
+    def test_convites_notificam_destinatarios_sem_duplicar_operacao_recusada(self):
+        with patch('services.community.PushDevices.send', return_value={'enviados': 0, 'falhas': 1}):
+            invite = Community.invite(self.db, self.a, {'id_guia': 'g'})
+            notifications = [doc.to_dict() for doc in self.db.collection('notificacoes').stream()]
+            self.assertEqual([item['id_usuario'] for item in notifications], ['g'])
+            self.assertEqual(notifications[0]['dados']['id_convite'], invite['id'])
+            self.denied(409, Community.invite, self.db, self.a, {'id_guia': 'g'})
+            self.assertEqual(len(list(self.db.collection('notificacoes').stream())), 1)
+            Community.answer_invitation(self.db, self.g, invite['id'], {'status': 'recusado'})
+            notifications = [doc.to_dict() for doc in self.db.collection('notificacoes').stream()]
+            self.assertEqual([item['id_usuario'] for item in notifications], ['g', 'a'])
+            Community.manage_invitation(self.db, self.a, invite['id'], 'reenviar')
+            self.assertEqual(len(list(self.db.collection('notificacoes').stream())), 3)
+            self.assertEqual(self.db.collection('convites_guias').document(invite['id']).get().to_dict()['status'], 'pendente')
+
+    def test_media_real_do_guia_e_publica_sem_expor_dados_privados(self):
+        self.db.collection('usuarios').document('g').update({'nota_media': 4.5, 'total_avaliacoes': 2})
+        public = Community.guide(self.db, 'g')
+        self.assertEqual(public['nota_media'], 4.5)
+        self.assertEqual(public['total_avaliacoes'], 2)
+        self.assertNotIn('email', public)
+        self.assertNotIn('documento', public)
+
+    def test_falha_no_email_libera_nova_tentativa_de_recuperacao(self):
+        from services.redefinicao_senha import RedefinicaoSenha
+        with patch('services.redefinicao_senha.Notificacoes.enviar_email_redefinicao', return_value=({'erro': 'indisponível'}, 500)):
+            result, status = RedefinicaoSenha.solicitar_redefinicao(self.db, {'email': 't@example.test'})
+        self.assertEqual(status, 500, result)
+        self.assertEqual(list(self.db.collection('redefinicoes_senha').stream()), [])
+        with patch('services.redefinicao_senha.Notificacoes.enviar_email_redefinicao', return_value=({}, 200)) as send:
+            result, status = RedefinicaoSenha.solicitar_redefinicao(self.db, {'email': 't@example.test'})
+        self.assertEqual(status, 200, result)
+        send.assert_called_once()
+        saved = list(self.db.collection('redefinicoes_senha').stream())
+        self.assertEqual(len(saved), 1)
+        self.assertNotIn('token', saved[0].to_dict())
+
     def test_convite_aceite_e_vinculo_da_trilha(self):
         self.denied(403,Community.invite,self.db,self.t,{'id_guia':'g'})
         invite=Community.invite(self.db,self.a,{'id_guia':'g'})
@@ -479,7 +516,7 @@ class CommunityTests(unittest.TestCase):
             result,status=Agendamentos.agendar_trilha(self.db,{
                 'id_usuario':'x','id_trilha':'t1','data_agendada':'2099-12-01'})
             self.assertEqual(status,201,result)
-            self.assertEqual(notify.call_args.args[1],'a')
+            self.assertEqual([call.args[1] for call in notify.call_args_list], ['a', 'x'])
         with patch('services.agendamentos.Notificacoes.notificar_usuario'):
             self.assertEqual(Agendamentos.responder_agendamento(self.db,'b1',self.a,'confirmado')[1],200)
         self.assertEqual(Trilhas.buscar_trilha_por_id(self.db,'t1')[1],200)

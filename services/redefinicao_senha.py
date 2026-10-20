@@ -61,7 +61,8 @@ class RedefinicaoSenha:
             token_hash = RedefinicaoSenha._gerar_hash_token(token_puro)
             expira_em = agora + datetime.timedelta(minutes=RedefinicaoSenha.TEMPO_EXPIRACAO_MINUTOS)
 
-            db.collection('redefinicoes_senha').add({
+            token_ref = db.collection('redefinicoes_senha').document(token_hash)
+            token_ref.set({
                 "id_usuario": id_usuario,
                 "token_hash": token_hash,
                 "criado_em": agora,
@@ -74,6 +75,7 @@ class RedefinicaoSenha:
             )
 
             if status_email != 200:
+                token_ref.delete()
                 # Falha no envio não deve vazar detalhe técnico pro usuário final
                 return {"erro": "Não foi possível enviar o e-mail de redefinição no momento. Tente novamente mais tarde."}, 500
 

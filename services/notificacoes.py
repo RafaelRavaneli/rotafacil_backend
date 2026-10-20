@@ -35,7 +35,7 @@ class Notificacoes:
             return 'marketing'
         if tipo in {
             'reserva', 'novo_agendamento', 'cancelamento', 'lembrete',
-            'checkin', 'checkout'
+            'checkin', 'checkout', 'resposta_agendamento', 'roteiro_finalizado'
         }:
             return 'agendamentos'
         return 'sistema'
@@ -126,7 +126,7 @@ class Notificacoes:
                 f"Se você não solicitou isso, ignore este e-mail."
             )
 
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as servidor:
                 servidor.login(remetente, senha_app)
                 servidor.send_message(msg)
 

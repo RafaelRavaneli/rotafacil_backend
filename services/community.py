@@ -52,7 +52,9 @@ def guide_public(doc):
     data = doc.to_dict()
     return {'id': doc.id, 'nome': data.get('nome', 'Guia'),
             'cidade': data.get('cidade', ''), 'estado': data.get('estado', ''),
-            'foto_url': data.get('foto_url'), 'verificado': data.get('verificado', False)}
+            'foto_url': data.get('foto_url'), 'verificado': data.get('verificado', False),
+            'nota_media': data.get('nota_media'),
+            'total_avaliacoes': data.get('total_avaliacoes', 0)}
 
 
 class Community:
@@ -80,6 +82,14 @@ class Community:
         return public
 
     @staticmethod
+    def _notificar_convite(db, recipient, invitation_id, title, message):
+        # Importação adiada: notificacoes usa PushDevices deste módulo.
+        from services.notificacoes import Notificacoes
+        return Notificacoes.notificar_usuario(
+            db, recipient, title, message,
+            {'tipo': 'convite_guia', 'id_convite': invitation_id})
+
+    @staticmethod
     def invite(db, user, data):
         if user.get('tipo') != 'agencia':
             raise CommunityError('Somente agências podem convidar guias.', 403)
@@ -96,6 +106,9 @@ class Community:
             ref.create(data)
         except AlreadyExists:
             raise CommunityError('Já existe um convite ou vínculo para este guia.', 409)
+        Community._notificar_convite(
+            db, guide_id, ref.id, 'Novo convite de agência',
+            f"{data['nome_agencia']} convidou você para integrar sua equipe.")
         return {'id': ref.id, **data}
 
     @staticmethod
@@ -115,6 +128,10 @@ class Community:
         if invite['status'] != 'pendente':
             raise CommunityError('Este convite já foi respondido.', 409)
         update_checked(ref, doc, {'status': status, 'respondido_em': now()})
+        Community._notificar_convite(
+            db, invite['id_agencia'], ref.id,
+            'Convite aceito' if status == 'aceito' else 'Convite recusado',
+            f"{invite.get('nome_guia', 'Guia')} respondeu ao convite: {status}.")
         return {'id': ref.id, **invite, 'status': status}
 
     @staticmethod
@@ -166,6 +183,12 @@ class Community:
             raise CommunityError('Ação de vínculo inválida.')
 
         update_checked(ref, doc, values)
+        recipient = invite['id_guia'] if is_agency else invite['id_agencia']
+        titles = {'reenviar': 'Convite reenviado', 'revogar': 'Convite revogado',
+                  'desligar': 'Vínculo encerrado'}
+        Community._notificar_convite(
+            db, recipient, ref.id, titles[action],
+            f"{user.get('nome', 'Participante')} atualizou o vínculo: {values['status']}.")
         return {'id': ref.id, **invite, **values}
 
     @staticmethod

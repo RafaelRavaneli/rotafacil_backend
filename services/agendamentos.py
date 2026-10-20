@@ -194,6 +194,11 @@ class Agendamentos:
                 dados={"tipo": "novo_agendamento", "id_agendamento": id_agendamento}
             )
 
+            Notificacoes.notificar_usuario(
+                db, dados['id_usuario'], 'Solicitação de reserva enviada',
+                f"Sua reserva para '{dados_trilha.get('nome', 'Roteiro')}' aguarda confirmação do responsável.",
+                dados={'tipo': 'reserva', 'id_agendamento': id_agendamento})
+
             return {"mensagem": "Agendamento realizado com sucesso!", "id": id_agendamento}, 201
         except Exception as e:
             return {"erro": f"Erro interno: {str(e)}"}, 500
