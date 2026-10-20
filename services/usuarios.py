@@ -4,8 +4,21 @@ import uuid
 from werkzeug.security import generate_password_hash
 from firebase_admin import firestore, storage
 from services.notificacoes import Notificacoes
+from services.cadastur import Cadastur
 
 class Usuarios:
+    @staticmethod
+    def _atualizar_cadastur(dados, atual):
+        if not {'cadastur_numero', 'cadastur_validade'} & set(dados):
+            return None
+        if atual.get('tipo') not in {'guia', 'agencia'}:
+            return {'erro': 'Cadastur é destinado a guias e agências.'}, 400
+        try:
+            dados.update(Cadastur.normalizar({**atual, **dados}, obrigatorio=True))
+        except ValueError as error:
+            return {'erro': str(error)}, 400
+        return None
+
     TIPOS_PERMITIDOS_NO_CADASTRO = {"usuario", "guia", "agencia"}  # admin NUNCA pode vir daqui
     STATUS_COMPROMISSO_ATIVO = {
         'agendado', 'pendente', 'confirmado', 'em_andamento'
@@ -14,7 +27,7 @@ class Usuarios:
         'nome', 'email', 'telefone', 'cidade', 'estado', 'documento',
         'foto_url', 'contato_emergencia_nome', 'contato_emergencia_telefone',
         'descricao_profissional', 'especialidades', 'nome_fantasia',
-        'razao_social',
+        'razao_social', 'cadastur_numero', 'cadastur_validade',
     }
 
     @staticmethod
@@ -262,6 +275,13 @@ class Usuarios:
             
             if list(usuario_existente):
                 return {"erro": "Email já cadastrado"}, 409
+
+            cadastur = {}
+            if tipo_solicitado in {'guia', 'agencia'}:
+                try:
+                    cadastur = Cadastur.normalizar(dados, obrigatorio=True)
+                except ValueError as error:
+                    return {'erro': str(error)}, 400
                     
             id_usuario = str(uuid.uuid4())
             usuario = {
@@ -275,6 +295,7 @@ class Usuarios:
                 "tipo": tipo_solicitado,
                 "documento": documento_limpo,
                 "tipo_documento": tipo_documento,
+                **cadastur,
                 "contato_emergencia_nome": dados.get("contato_emergencia_nome"),
                 "contato_emergencia_telefone": dados.get("contato_emergencia_telefone"),
                 "verificado": False,
@@ -387,6 +408,9 @@ class Usuarios:
                 return {"erro": "Usuário não encontrado"}, 404
             doc_id = docs[0].id
             atual = docs[0].to_dict() or {}
+            erro_cadastur = Usuarios._atualizar_cadastur(dados, atual)
+            if erro_cadastur:
+                return erro_cadastur
             if ("documento" in dados and
                     not Usuarios._documento_compativel_com_perfil(
                         atual.get('tipo'), dados.get('tipo_documento'))):
@@ -435,6 +459,9 @@ class Usuarios:
             if not usuarios_ref.exists:
                 return {"erro": "Usuário não encontrado"}, 404
             atual = usuarios_ref.to_dict() or {}
+            erro_cadastur = Usuarios._atualizar_cadastur(dados, atual)
+            if erro_cadastur:
+                return erro_cadastur
             if ("documento" in dados and
                     not Usuarios._documento_compativel_com_perfil(
                         atual.get('tipo'), dados.get('tipo_documento'))):
@@ -475,7 +502,7 @@ class Usuarios:
             return {"erro": f"Erro ao verificar usuário: {str(e)}"}, 500
 
     @staticmethod
-    def mudar_tipo_usuario(db, id_usuario, novo_tipo, documento_novo=None):
+    def mudar_tipo_usuario(db, id_usuario, novo_tipo, documento_novo=None, cadastur=None):
         try:
             novo_tipo = (novo_tipo or "").strip().lower()
             if novo_tipo not in Usuarios.TIPOS_PERMITIDOS_NO_CADASTRO:
@@ -525,6 +552,10 @@ class Usuarios:
 
                 atualizacao["documento"] = documento_limpo
                 atualizacao["tipo_documento"] = tipo_documento
+                try:
+                    atualizacao.update(Cadastur.normalizar(cadastur or {}, obrigatorio=True))
+                except ValueError as error:
+                    return {'erro': str(error)}, 400
 
             if novo_tipo == 'usuario':
                 atualizacao.update({
@@ -534,6 +565,8 @@ class Usuarios:
                     'especialidades': [],
                     'nome_fantasia': None,
                     'razao_social': None,
+                    'cadastur_numero': '',
+                    'cadastur_validade': '',
                 })
             elif novo_tipo == 'guia':
                 atualizacao.update({'nome_fantasia': None, 'razao_social': None})

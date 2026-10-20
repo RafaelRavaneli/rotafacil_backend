@@ -3346,6 +3346,16 @@
           },
           "contato_emergencia_telefone": {
             "type": "string"
+          },
+          "cadastur_numero": {
+            "type": "string",
+            "description": "Número Cadastur obrigatório para cadastro ou mudança para guia/agência. Não implica validação oficial.",
+            "example": "123456789"
+          },
+          "cadastur_validade": {
+            "type": "string",
+            "description": "Validade opcional no formato AAAA-MM-DD.",
+            "example": "2029-12-31"
           }
         },
         "required": [
@@ -3447,6 +3457,16 @@
           "createdAt": {
             "type": "string",
             "description": "Timestamp serializado pelo Flask."
+          },
+          "cadastur_numero": {
+            "type": "string",
+            "description": "Número Cadastur obrigatório para cadastro ou mudança para guia/agência. Não implica validação oficial.",
+            "example": "123456789"
+          },
+          "cadastur_validade": {
+            "type": "string",
+            "description": "Validade opcional no formato AAAA-MM-DD.",
+            "example": "2029-12-31"
           }
         }
       },
@@ -3473,6 +3493,16 @@
           "documento": {
             "type": "string",
             "description": "Obrigatorio ao mudar para guia/agencia se nao houver documento valido cadastrado."
+          },
+          "cadastur_numero": {
+            "type": "string",
+            "description": "Número Cadastur obrigatório para cadastro ou mudança para guia/agência. Não implica validação oficial.",
+            "example": "123456789"
+          },
+          "cadastur_validade": {
+            "type": "string",
+            "description": "Validade opcional no formato AAAA-MM-DD.",
+            "example": "2029-12-31"
           }
         },
         "required": [
@@ -3532,7 +3562,11 @@
           },
           "dificuldade": {
             "type": "string",
-            "enum": ["Iniciante", "Intermediário", "Avançado"],
+            "enum": [
+              "Iniciante",
+              "Intermediário",
+              "Avançado"
+            ],
             "example": "Intermediário"
           },
           "modalidade": {
@@ -3543,8 +3577,14 @@
           "atividades": {
             "type": "array",
             "minItems": 1,
-            "items": {"type": "string"},
-            "example": ["Trilha", "Rapel", "Acampamento"]
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Trilha",
+              "Rapel",
+              "Acampamento"
+            ]
           },
           "distancia_km": {
             "type": "number",
@@ -4116,7 +4156,11 @@
           },
           "dificuldade": {
             "type": "string",
-            "enum": ["Iniciante", "Intermediário", "Avançado"],
+            "enum": [
+              "Iniciante",
+              "Intermediário",
+              "Avançado"
+            ],
             "example": "Intermediário"
           },
           "modalidade": {
@@ -4126,7 +4170,9 @@
           },
           "atividades": {
             "type": "array",
-            "items": {"type": "string"}
+            "items": {
+              "type": "string"
+            }
           },
           "distancia_km": {
             "type": "number",

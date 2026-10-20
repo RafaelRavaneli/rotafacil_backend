@@ -117,10 +117,23 @@ class IntegrationTests(unittest.TestCase):
         self.db.collection.return_value.where.return_value.stream.return_value = []
         result, status = Usuarios.cadastrar_usuario(self.db, {
             'nome':'Guia','email':'guia@example.test','senha':'senha123',
-            'tipo':'guia','documento':'52998224725'})
+            'tipo':'guia','documento':'52998224725', 'cadastur_numero':'12.345.678/0001-90'})
         self.assertEqual(status, 201, result)
         saved = self.db.collection.return_value.document.return_value.set.call_args.args[0]
         self.assertEqual(saved['documento'], '52998224725')
+        self.assertEqual(saved['cadastur_numero'], '12345678000190')
+        self.assertFalse(saved['verificado'])
+
+    def test_cadastur_obrigatorio_para_ambos_perfis_sem_exigir_do_turista(self):
+        self.db.collection.return_value.where.return_value.stream.return_value = []
+        base = {'nome':'Pessoa', 'email':'pessoa@example.test', 'senha':'senha123'}
+        for tipo, documento in [('guia','52998224725'), ('agencia','11222333000181')]:
+            result, status = Usuarios.cadastrar_usuario(self.db, {**base, 'tipo':tipo, 'documento':documento})
+            self.assertEqual(status,400,result)
+            self.assertIn('Cadastur',result['erro'])
+            result, status = Usuarios.cadastrar_usuario(self.db, {**base, 'tipo':tipo, 'documento':documento, 'cadastur_numero':'123456789', 'cadastur_validade':'2099-12-31'})
+            self.assertEqual(status,201,result)
+        self.assertEqual(Usuarios.cadastrar_usuario(self.db,base)[1],201)
 
     def test_cadastro_valida_email_senha_e_documento_do_perfil(self):
         base = {'nome':'Pessoa','senha':'senha123','tipo':'usuario'}

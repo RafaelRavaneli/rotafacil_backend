@@ -614,23 +614,40 @@ class CommunityTests(unittest.TestCase):
         self.db.collection('agendamentos').document('b1').set({
             'id_usuario':'t','status':'pendente'})
         result,status=Usuarios.mudar_tipo_usuario(
-            self.db,'t','guia','52998224725')
+            self.db,'t','guia','52998224725',cadastur={'cadastur_numero':'123456789'})
         self.assertEqual(status,409,result)
         self.assertEqual(self.db.collection('usuarios').document('t')
                          .get().to_dict()['tipo'],'usuario')
 
     def test_mudanca_de_tipo_exige_documento_do_perfil_correto(self):
         self.assertEqual(Usuarios.mudar_tipo_usuario(
+            self.db,'t','guia','52998224725')[1],400)
+        self.assertEqual(Usuarios.mudar_tipo_usuario(
             self.db,'t','guia','11222333000181')[1],400)
         self.assertEqual(Usuarios.mudar_tipo_usuario(
             self.db,'t','agencia','52998224725')[1],400)
         result,status=Usuarios.mudar_tipo_usuario(
-            self.db,'t','guia','52998224725')
+            self.db,'t','guia','52998224725',cadastur={'cadastur_numero':'123456789'})
         self.assertEqual(status,200,result)
         usuario=self.db.collection('usuarios').document('t').get().to_dict()
         self.assertEqual(usuario['tipo'],'guia')
         self.assertEqual(usuario['tipo_documento'],'cpf')
         self.assertFalse(usuario['verificado'])
+
+    def test_cadastur_perfil_legado_persiste_sem_conceder_verificacao(self):
+        self.assertEqual(Usuarios.atualizar_usuario_por_id(
+            self.db, 'g', {'nome':'Guia atualizado'})[1],200)
+        result,status=Usuarios.atualizar_usuario_por_id(self.db,'g',{
+            'cadastur_numero':'12.345.678/0001-90','cadastur_validade':'2099-12-31'})
+        self.assertEqual(status,200,result)
+        salvo=self.db.collection('usuarios').document('g').get().to_dict()
+        self.assertEqual(salvo['cadastur_numero'],'12345678000190')
+        self.assertEqual(salvo['cadastur_validade'],'2099-12-31')
+        self.assertFalse(salvo.get('verificado',False))
+        self.assertEqual(Usuarios.atualizar_usuario_por_email(self.db,self.g['email'],{
+            'cadastur_numero':'','cadastur_validade':''})[1],400)
+        self.assertEqual(Usuarios.atualizar_usuario_por_id(self.db,'t',{
+            'cadastur_numero':'123456789'})[1],400)
 
     def test_mudanca_de_operador_limpa_vinculos_sem_apagar_historico(self):
         self.db.collection('trilhas').document('propria').set({

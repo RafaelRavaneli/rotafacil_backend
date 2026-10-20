@@ -90,7 +90,8 @@ def mudar_tipo_usuario(usuario_atual, id):
     if not eh_dono_ou_tem_papel(usuario_atual, id, 'admin'):
         return jsonify({"erro": "Acesso negado. Você só pode alterar o próprio tipo."}), 403
     dados = request.get_json(silent=True) or {}
-    resposta, status = Usuarios.mudar_tipo_usuario(bd, id, dados.get('tipo'), dados.get('documento'))
+    resposta, status = Usuarios.mudar_tipo_usuario(
+        bd, id, dados.get('tipo'), dados.get('documento'), cadastur=dados)
     return jsonify(resposta), status
 
 # --- Contato de emergência: guia com agendamento ativo, ou admin ---

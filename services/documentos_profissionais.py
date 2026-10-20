@@ -90,6 +90,8 @@ class DocumentosProfissionais:
                 if dono.exists:
                     dados_dono = dono.to_dict() or {}
                     item['nome_usuario'] = dados_dono.get('nome')
+                    item['cadastur_numero'] = dados_dono.get('cadastur_numero', '')
+                    item['cadastur_validade'] = dados_dono.get('cadastur_validade', '')
                     if papel == 'admin':
                         item['email_usuario'] = dados_dono.get('email')
             itens.sort(key=lambda item: item.get('criado_em') or '', reverse=True)
