@@ -84,6 +84,17 @@ class Agendamentos:
             id_guia = dados_trilha.get("id_guia")
 
             data_agendada = str(dados.get('data_agendada') or '').strip()
+            id_data = str(dados.get('id_data') or '').strip()
+            datas = dados_trilha.get('datas') or []
+            data_selecionada = None
+            if datas:
+                if not id_data:
+                    return {"erro": "Selecione uma data disponível para este roteiro."}, 400
+                data_selecionada = next(
+                    (item for item in datas if str(item.get('id')) == id_data), None)
+                if data_selecionada is None:
+                    return {"erro": "A data selecionada não pertence mais a este roteiro."}, 409
+                data_agendada = str(data_selecionada.get('data_hora_inicio') or '')[:10]
             try:
                 if date.fromisoformat(data_agendada) < date.today():
                     return {"erro": "Não é possível reservar uma data passada."}, 400
@@ -93,8 +104,13 @@ class Agendamentos:
             existentes = db.collection('agendamentos') \
                 .where('id_usuario', '==', dados['id_usuario']) \
                 .where('id_trilha', '==', dados['id_trilha']).stream()
-            if any(Agendamentos._status_ativo(doc.to_dict().get('status')) for doc in existentes):
-                return {"erro": "Você já possui uma reserva ativa para este roteiro."}, 409
+            if any(
+                Agendamentos._status_ativo(doc.to_dict().get('status')) and
+                ((id_data and doc.to_dict().get('id_data') == id_data) or
+                 (not id_data and doc.to_dict().get('data_agendada') == data_agendada))
+                for doc in existentes
+            ):
+                return {"erro": "Você já possui uma reserva ativa para esta data."}, 409
 
             capacidade = dados_trilha.get('capacidade')
             if capacidade is not None:
@@ -117,7 +133,12 @@ class Agendamentos:
                 "id_usuario": dados.get("id_usuario"),
                 "id_trilha": dados.get("id_trilha"),
                 "id_guia": id_guia,
+                "id_data": id_data or None,
                 "data_agendada": data_agendada,
+                "data_hora_inicio": (data_selecionada or {}).get('data_hora_inicio') or
+                                    dados_trilha.get('data_hora_inicio'),
+                "data_hora_fim": (data_selecionada or {}).get('data_hora_fim') or
+                                 dados_trilha.get('data_hora_fim'),
                 "valor_pago": dados_trilha.get('preco', 0),
                 "status": "agendado",
                 "createdAt": firestore.SERVER_TIMESTAMP

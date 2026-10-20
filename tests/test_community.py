@@ -402,6 +402,37 @@ class CommunityTests(unittest.TestCase):
             'data_hora_fim':'2099-07-11T15:00:00'}
         self.assertEqual(Trilhas.cadastrar_trilha(self.db,conflito,self.g)[1],409)
 
+    def test_roteiro_aceita_varias_datas_e_reserva_a_saida_escolhida(self):
+        dados={
+            'nome':'Expedição recorrente','descricao':'Mesmo roteiro em várias datas',
+            'dificuldade':'Intermediário','capacidade':2,
+            'datas':[
+                {'id':'saida-1','data_hora_inicio':'2099-08-10T08:00',
+                 'data_hora_fim':'2099-08-10T15:00'},
+                {'id':'saida-2','data_hora_inicio':'2099-09-12T07:00',
+                 'data_hora_fim':'2099-09-12T14:00'},
+            ],
+        }
+        result,status=Trilhas.cadastrar_trilha(self.db,dados,self.g)
+        self.assertEqual(status,201,result)
+        roteiro=self.db.collection('trilhas').document(result['id']).get().to_dict()
+        self.assertEqual(len(roteiro['datas']),2)
+        self.assertEqual(roteiro['data_atividade'],'2099-08-10')
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            reserva,status=Agendamentos.agendar_trilha(self.db,{
+                'id_usuario':'t','id_trilha':result['id'],
+                'id_data':'saida-2','data_agendada':'2099-01-01'})
+        self.assertEqual(status,201,reserva)
+        salva=self.db.collection('agendamentos').document(reserva['id']).get().to_dict()
+        self.assertEqual(salva['id_data'],'saida-2')
+        self.assertEqual(salva['data_agendada'],'2099-09-12')
+        self.assertEqual(salva['data_hora_inicio'],'2099-09-12T07:00')
+        with patch('services.agendamentos.Notificacoes.notificar_usuario'):
+            segunda,status=Agendamentos.agendar_trilha(self.db,{
+                'id_usuario':'t','id_trilha':result['id'],
+                'id_data':'saida-1','data_agendada':'2099-01-01'})
+        self.assertEqual(status,201,segunda)
+
     def test_reserva_usa_preco_do_servidor_bloqueia_duplicidade_e_lotacao(self):
         self.db.collection('trilhas').document('t1').set({
             'nome':'Trilha final','ativo':True,'id_guia':'g',
