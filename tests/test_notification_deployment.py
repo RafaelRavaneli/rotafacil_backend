@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 """Verifica notificacoes e publicacao sem acessar Firebase ou SMTP reais."""
 import datetime as dt
 import os
@@ -77,7 +78,7 @@ class NotificationDeploymentTests(unittest.TestCase):
         with patch('services.notificacoes.PushDevices.send', side_effect=RuntimeError('Offline')):
             result, status = Agendamentos.agendar_trilha(self.db, {
                 'id_usuario': 'u1', 'id_trilha': 't1',
-                'data_agendada': '2026-10-20', 'valor_pago': 50})
+                'data_agendada': (date.today() + timedelta(days=1)).isoformat(), 'valor_pago': 50})
         self.assertEqual(status, 201)
         self.assertTrue(self.db.collection('agendamentos').document(result['id']).get().exists)
 

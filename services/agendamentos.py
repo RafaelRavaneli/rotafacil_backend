@@ -82,8 +82,6 @@ class Agendamentos:
     @staticmethod
     def _usuario_pode_operar_agendamento(db, dados_agendamento, usuario_atual):
         papel = (usuario_atual.get('tipo') or '').strip().lower()
-        if papel == 'admin':
-            return True
         if papel not in {'guia', 'agencia'}:
             return False
         trilha_id = dados_agendamento.get('id_trilha')
@@ -119,7 +117,7 @@ class Agendamentos:
                 return {"erro": "Roteiro não encontrado. Verifique o id_trilha informado."}, 404
 
             dados_trilha = trilha_ref.to_dict()
-            if dados_trilha.get('ativo') is False:
+            if dados_trilha.get('ativo') is False or Trilhas._restricao_administrativa(db,dados_trilha):
                 return {"erro": "Este roteiro não está disponível para agendamento."}, 409
             id_guia = dados_trilha.get("id_guia")
 

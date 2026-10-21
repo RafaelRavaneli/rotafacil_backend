@@ -38,7 +38,9 @@ def buscar_trilhas_avancada(usuario_atual):
     # Pega os parâmetros da URL (Query Params) e transforma num dicionário
     filtros = request.args.to_dict()
     resposta, status = Trilhas.buscar_trilhas_avancado(bd, filtros)
-    return jsonify(resposta), status
+    response = jsonify(resposta)
+    response.headers["Cache-Control"] = "no-store"
+    return response, status
 
 # --- Buscar uma trilha específica: qualquer usuário logado ---
 @trilhas_bp.route('/<id_trilha>', methods=['GET'])

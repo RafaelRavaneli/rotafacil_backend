@@ -60,8 +60,8 @@ def guide_public(doc):
 class Community:
     @staticmethod
     def guides(db):
-        return [guide_public(doc) for doc in db.collection('usuarios').where('tipo', '==', 'guia').stream()
-                if doc.to_dict().get('ativo', True)]
+        from services.avaliacoes import Avaliacoes
+        return [{**guide_public(doc), **Avaliacoes.estatisticas(db,doc.id,'id_guia','nota_guia')} for doc in db.collection('usuarios').where('tipo','==','guia').stream() if doc.to_dict().get('ativo',True)]
 
     @staticmethod
     def guide(db, guide_id):
@@ -73,6 +73,8 @@ class Community:
         if not isinstance(specialties, list):
             specialties = []
         public = guide_public(guide)
+        from services.avaliacoes import Avaliacoes
+        public.update(Avaliacoes.estatisticas(db,guide_id,'id_guia','nota_guia'))
         public.update({
             'descricao_profissional': str(
                 data.get('descricao_profissional') or '').strip(),

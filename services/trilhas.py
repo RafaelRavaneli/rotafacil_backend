@@ -1,4 +1,7 @@
+from services.proximidade import Proximidade
+from services.acessibilidade import Acessibilidade
 from services.community import Community
+from services.checklists import Checklists
 import uuid
 import math
 from datetime import date, datetime
@@ -17,10 +20,10 @@ class Trilhas:
     CAMPOS_EDITAVEIS = {
         'nome', 'descricao', 'dificuldade', 'modalidade', 'distancia_km',
         'cidade', 'estado', 'data_atividade', 'latitude', 'longitude',
-        'imagem_url', 'acessivel', 'itens_recomendados', 'trajeto',
+        'imagem_url', 'acessivel', 'itens_recomendados', 'itens_obrigatorios', 'trajeto',
         'id_guia', 'ativo', 'preco', 'capacidade', 'horario_inicio',
         'horario_fim', 'data_fim', 'data_hora_inicio', 'data_hora_fim',
-        'atividades', 'arquivado', 'ponto_encontro', 'datas',
+        'atividades', 'arquivado', 'ponto_encontro', 'datas', 'acessibilidade', 'emergencia_organizador_telefone', 'emergencia_instrucoes',
     }
 
     @staticmethod
@@ -28,6 +31,28 @@ class Trilhas:
         proibidos = sorted(set(dados) - Trilhas.CAMPOS_EDITAVEIS)
         if proibidos:
             return f"Campos não permitidos: {', '.join(proibidos)}"
+        for campo in ('itens_obrigatorios', 'itens_recomendados'):
+            if campo in dados:
+                try:
+                    dados[campo] = Checklists.normalizar_itens(dados[campo], campo)
+                except ValueError as error:
+                    return str(error)
+        if 'acessibilidade' in dados:
+            try:
+                dados['acessibilidade'] = Acessibilidade.validar(dados['acessibilidade'])
+            except ValueError as error:
+                return str(error)
+        for campo, limite in [('emergencia_organizador_telefone',30), ('emergencia_instrucoes',1500)]:
+            if campo in dados:
+                valor = dados[campo]
+                if not isinstance(valor,str) or len(valor.strip()) > limite:
+                    return f'{campo} deve ser texto com até {limite} caracteres'
+                dados[campo] = valor.strip()
+        if dados.get('emergencia_organizador_telefone'):
+            import re
+            telefone = dados['emergencia_organizador_telefone']
+            if not re.fullmatch(r'[+()\d .-]+',telefone) or not 10 <= len(re.sub(r'\D','',telefone)) <= 15:
+                return 'Telefone de emergência do organizador inválido'
         limites = {'nome': 160, 'descricao': 4000, 'dificuldade': 40,
                    'modalidade': 80, 'cidade': 120, 'estado': 2,
                    'ponto_encontro': 250}
@@ -290,8 +315,24 @@ class Trilhas:
         return number
 
     @staticmethod
+    def _restricao_administrativa(db,dados):
+        if dados.get('bloqueado_moderacao') is True:
+            return True
+        for identificador in {dados.get('criado_por'),dados.get('id_guia')} - {None,''}:
+            doc=db.collection('usuarios').document(str(identificador)).get()
+            if not doc.exists:
+                doc=next(iter(db.collection('usuarios').where('email','==',identificador).stream()),None)
+            if doc is not None and doc.exists and (doc.to_dict() or {}).get('ativo') is False:
+                return True
+        return False
+
+    @staticmethod
     def _serializar_trilha(db, doc, responsaveis=None):
         data = {**(doc.to_dict() or {}), 'id': doc.id}
+        from services.avaliacoes import Avaliacoes
+        data.update(Avaliacoes.estatisticas(db,doc.id))
+        if Trilhas._restricao_administrativa(db,data):
+            data['ativo'] = False
         if not data.get('datas') and data.get('data_hora_inicio') and data.get('data_hora_fim'):
             data['datas'] = [{
                 'id': f'legacy-{doc.id}',
@@ -341,35 +382,7 @@ class Trilhas:
                 return True
         return False
 
-    @staticmethod
-    def _calcular_distancia_km(lat1, lon1, lat2, lon2):
-        """Distância em linha reta (Haversine) entre duas coordenadas, em km."""
-        R = 6371
-        lat1_rad, lon1_rad, lat2_rad, lon2_rad = map(math.radians, [lat1, lon1, lat2, lon2])
-        dlat = lat2_rad - lat1_rad
-        dlon = lon2_rad - lon1_rad
-        a = math.sin(dlat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
-        c = 2 * math.asin(math.sqrt(a))
-        return R * c
-
-    @staticmethod
-    def _precisao_geohash_para_raio(raio_km):
-        """
-        Escolhe quantos caracteres de geohash usar na busca, com base no raio
-        pedido. Referência de tamanho de célula por precisão: geohash.org / Wikipedia.
-        Escolhe a maior precisão (célula mais específica) que ainda cobre o raio inteiro.
-        """
-        tabela = [
-            (1, 5000), (2, 1250), (3, 156), (4, 39),
-            (5, 4.9), (6, 1.2), (7, 0.153), (8, 0.038), (9, 0.0048),
-        ]
-        precisao_escolhida = 1
-        for precisao, tamanho_celula_km in tabela:
-            if tamanho_celula_km >= raio_km:
-                precisao_escolhida = precisao
-            else:
-                break
-        return precisao_escolhida
+    _calcular_distancia_km = staticmethod(Proximidade.distancia)
 
     @staticmethod
     def _validar_lista_coordenadas(lista):
@@ -412,12 +425,9 @@ class Trilhas:
             geohash = None
             if latitude is not None or longitude is not None:
                 try:
-                    latitude = float(latitude)
-                    longitude = float(longitude)
-                except (TypeError, ValueError):
-                    return {"erro": "latitude e longitude devem ser números válidos"}, 400
-                if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
-                    return {"erro": "Coordenadas fora do intervalo válido"}, 400
+                    latitude, longitude, _ = Proximidade.validar(latitude, longitude, 0)
+                except ValueError as erro:
+                    return {'erro': str(erro)}, 400
                 geohash = pgh.encode(latitude, longitude, precision=9)
 
             itens_recomendados = dados.get("itens_recomendados", [])
@@ -463,7 +473,11 @@ class Trilhas:
                 "geohash": geohash,
                 "imagem_url": dados.get("imagem_url"),
                 "acessivel": bool(dados.get("acessivel", False)),
+                "acessibilidade": dados.get("acessibilidade", {}),
+                "emergencia_organizador_telefone": dados.get("emergencia_organizador_telefone", ""),
+                "emergencia_instrucoes": dados.get("emergencia_instrucoes", ""),
                 "itens_recomendados": itens_recomendados,
+                "itens_obrigatorios": dados.get('itens_obrigatorios', []),
                 "trajeto": trajeto,
                 "criado_por": criado_por,
                 "id_guia": guia_responsavel,
@@ -532,14 +546,6 @@ class Trilhas:
                 except (TypeError, ValueError):
                     return {'erro': 'Informe uma distância do percurso válida, maior que zero, em quilômetros.'}, 400
 
-            if "latitude" in dados and "longitude" in dados:
-                try:
-                    dados["latitude"] = float(dados["latitude"])
-                    dados["longitude"] = float(dados["longitude"])
-                except (TypeError, ValueError):
-                    return {"erro": "latitude e longitude devem ser números válidos"}, 400
-                dados["geohash"] = pgh.encode(dados["latitude"], dados["longitude"], precision=9)
-
             if "trajeto" in dados:
                 valido, resultado = Trilhas._validar_lista_coordenadas(dados["trajeto"])
                 if not valido:
@@ -555,8 +561,18 @@ class Trilhas:
             if not doc.exists:
                 return {"erro": "Roteiro não encontrado"}, 404
 
+            if (usuario_atual or {}).get('tipo') == 'admin':
+                return {'erro':'Use a moderação administrativa de roteiros com motivo e histórico.'},403
             if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
                 return {"erro": "Acesso negado. Você não tem permissão para gerenciar este roteiro."}, 403
+
+            if 'latitude' in dados or 'longitude' in dados:
+                try:
+                    lat, lon, _ = Proximidade.validar(dados.get('latitude', doc.to_dict().get('latitude')),
+                                                     dados.get('longitude', doc.to_dict().get('longitude')), 0)
+                except ValueError as erro:
+                    return {'erro': str(erro)}, 400
+                dados.update(latitude=lat, longitude=lon, geohash=pgh.encode(lat, lon, precision=9))
 
             try:
                 altera_datas = any(campo in dados for campo in {
@@ -577,6 +593,8 @@ class Trilhas:
             atual = doc.to_dict()
             if dados.get('arquivado') is True and atual.get('ativo') is not False:
                 return {'erro': 'Desative o roteiro antes de arquivá-lo.'}, 409
+            if dados.get('ativo') is True and Trilhas._restricao_administrativa(db,doc.to_dict() or {}):
+                return {'erro':'O roteiro possui restrição administrativa e não pode ser reativado.'},409
             if dados.get('ativo') is True:
                 dados['arquivado'] = False
 
@@ -597,48 +615,52 @@ class Trilhas:
     @staticmethod
     def buscar_trilhas_avancado(db, filtros):
         try:
+            recursos = [item.strip() for item in filtros.get('recursos_acessibilidade', '').split(',') if item.strip()]
+            if any(item not in Acessibilidade.BOOLEANOS or item == 'acompanhante_necessario' for item in recursos):
+                return {'erro': 'Recurso de acessibilidade inválido'}, 400
             lat_usuario = filtros.get('latitude')
             lon_usuario = filtros.get('longitude')
             raio_km = filtros.get('raio_km')
-            busca_geografica = bool(lat_usuario and lon_usuario and raio_km)
-
-            query = db.collection('trilhas')
-
-            # Filtros de igualdade: sempre podem ser combinados, geo ou não
-            if filtros.get('dificuldade'):
-                query = query.where(filter=FieldFilter('dificuldade', '==', filtros.get('dificuldade')))
-                
-            if filtros.get('estado'):
-                query = query.where(filter=FieldFilter('estado', '==', filtros.get('estado')))
-
-            if filtros.get('cidade'):
-                query = query.where(filter=FieldFilter('cidade', '==', filtros.get('cidade')))
-            query = query.where(filter=FieldFilter('ativo', '==', True))
-
-            if filtros.get('acessivel') is not None:
-                valor_acessivel = str(filtros.get('acessivel')).strip().lower() == 'true'
-                query = query.where(filter=FieldFilter('acessivel', '==', valor_acessivel))
-            query = query.where(filter=FieldFilter('ativo', '==', True))
-
+            paginado = 'pagina' in filtros
+            try:
+                pagina = int(filtros.get('pagina', 1))
+                tamanho = int(filtros.get('tamanho', 30))
+                if pagina < 1 or not 1 <= tamanho <= 100:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                return {'erro': 'Página deve ser positiva e tamanho entre 1 e 100.'}, 400
+            busca_geografica = any(k in filtros for k in ('latitude', 'longitude', 'raio_km'))
             if busca_geografica:
                 try:
-                    lat_usuario = float(lat_usuario)
-                    lon_usuario = float(lon_usuario)
-                    raio_km = float(raio_km)
-                except ValueError:
-                    return {"erro": "latitude, longitude e raio_km devem ser números válidos"}, 400
-
-                # O Firestore só permite UM campo com filtro de intervalo por consulta.
-                # Como o geohash já ocupa esse papel aqui, o filtro de data (se enviado
-                # junto) é aplicado depois, em Python, e não como where() do Firestore.
-                precisao = max(1, Trilhas._precisao_geohash_para_raio(raio_km) - 1)
-                prefixo = pgh.encode(lat_usuario, lon_usuario, precision=precisao)
-                query = query.where(filter=FieldFilter('geohash', '>=', prefixo)) \
-                             .where(filter=FieldFilter('geohash', '<=', prefixo + '\uf8ff'))
-            resultados = query.stream()
+                    lat_usuario, lon_usuario, raio_km = Proximidade.validar(lat_usuario, lon_usuario, raio_km)
+                except ValueError as erro:
+                    return {'erro': str(erro)}, 400
+                resultados = Proximidade.candidatos(db, lat_usuario, lon_usuario, raio_km)
+            else:
+                resultados = db.collection('trilhas').where(filter=FieldFilter('ativo', '==', True)).stream()
             responsaveis = {}
             lista_trilhas = [Trilhas._serializar_trilha(db, doc, responsaveis) for doc in resultados]
+            lista_trilhas = [item for item in lista_trilhas if item.get('ativo') is True]
+            for campo in ('dificuldade', 'estado', 'cidade'):
+                if filtros.get(campo):
+                    termo = str(filtros[campo]).strip().casefold()
+                    lista_trilhas = [t for t in lista_trilhas if str(t.get(campo, '')).strip().casefold() == termo]
+            if filtros.get('acessivel') is not None:
+                acessivel = str(filtros['acessivel']).lower() == 'true'
+                lista_trilhas = [t for t in lista_trilhas if t.get('acessivel') is acessivel]
+            if filtros.get('modalidade'):
+                termo = filtros['modalidade'].strip().casefold()
+                aliases = {'trilha': ['trilha', 'trekking', 'caminhada'], 'acampamento': ['acampamento', 'camping'],
+                           'aquatrekking': ['aquatrekking', 'aqua trekking'], 'ciclismo': ['ciclismo', 'bike', 'cicloturismo']}
+                termos = aliases.get(termo, [termo])
+                lista_trilhas = [t for t in lista_trilhas if any(
+                    alias in str(atividade).casefold() for alias in termos
+                    for atividade in (t.get('atividades') or [t.get('modalidade', '')]))]
 
+
+            if recursos:
+                lista_trilhas = [t for t in lista_trilhas if all(
+                    (t.get('acessibilidade') or {}).get(campo) is True for campo in recursos)]
             data_inicio = filtros.get('data_inicio')
             data_fim = filtros.get('data_fim')
             if data_inicio or data_fim:
@@ -651,15 +673,24 @@ class Trilhas:
                 for trilha in lista_trilhas:
                     lat_trilha = trilha.get('latitude')
                     lon_trilha = trilha.get('longitude')
-                    if lat_trilha is None or lon_trilha is None:
+                    try:
+                        lat_trilha, lon_trilha, _ = Proximidade.validar(lat_trilha, lon_trilha, 0)
+                    except ValueError:
                         continue
                     distancia = Trilhas._calcular_distancia_km(lat_usuario, lon_usuario, lat_trilha, lon_trilha)
-                    if distancia <= raio_km:
-                        trilha['distancia_usuario_km'] = round(distancia, 2)
+                    if distancia <= raio_km + 1e-9:
+                        trilha['distancia_usuario_km'] = distancia
                         trilhas_no_raio.append(trilha)
 
-                trilhas_no_raio.sort(key=lambda t: t['distancia_usuario_km'])
+                trilhas_no_raio.sort(key=lambda t: (t['distancia_usuario_km'], t['id']))
                 lista_trilhas = trilhas_no_raio
+
+            else:
+                lista_trilhas.sort(key=lambda t: t['id'])
+            if paginado:
+                inicio = (pagina-1)*tamanho
+                return {'itens': lista_trilhas[inicio:inicio+tamanho], 'total': len(lista_trilhas),
+                        'pagina': pagina, 'proxima_pagina': pagina+1 if inicio+tamanho < len(lista_trilhas) else None}, 200
 
             if not lista_trilhas:
                 return {"mensagem": "Nenhum roteiro encontrado com esses filtros."}, 404
@@ -667,13 +698,15 @@ class Trilhas:
             return lista_trilhas, 200
 
         except Exception as e:
-            return {"erro": f"Erro na busca avançada: {str(e)}"}, 500
+            return {"erro": "Não foi possível consultar os roteiros. Tente novamente."}, 503
     @staticmethod
     def deletar_trilha(db, id_trilha, usuario_atual):
         doc_ref = db.collection('trilhas').document(id_trilha)
         doc = doc_ref.get()
         if not doc.exists:
             return {"erro": "Roteiro não encontrado"}, 404
+        if (usuario_atual or {}).get('tipo') == 'admin':
+            return {'erro':'Use a moderação administrativa de roteiros com motivo e histórico.'},403
         if not Trilhas._usuario_pode_gerenciar_trilha(doc.to_dict(), usuario_atual):
             return {"erro": "Você não tem permissão para excluir este roteiro."}, 403
         try:

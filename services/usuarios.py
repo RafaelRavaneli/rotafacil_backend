@@ -1,3 +1,4 @@
+from services.emergencia import Emergencia
 from services.documentos_legais import DocumentosLegais
 from services.verificacao_email import VerificacaoEmail
 import re
@@ -5,7 +6,6 @@ import os
 import uuid
 from werkzeug.security import generate_password_hash
 from firebase_admin import firestore, storage
-from services.notificacoes import Notificacoes
 from services.cadastur import Cadastur
 
 class Usuarios:
@@ -28,6 +28,7 @@ class Usuarios:
     CAMPOS_EDITAVEIS = {
         'nome', 'email', 'telefone', 'cidade', 'estado', 'documento',
         'foto_url', 'contato_emergencia_nome', 'contato_emergencia_telefone',
+        'contato_emergencia_relacao', 'contato_emergencia_consentimento',
         'descricao_profissional', 'especialidades', 'nome_fantasia',
         'razao_social', 'cadastur_numero', 'cadastur_validade',
     }
@@ -151,6 +152,8 @@ class Usuarios:
 
         for colecao, campo in (
             ('favoritos', 'id_usuario'),
+            ('checklists_pessoais', 'id_usuario'),
+            ('consultas_emergencia', 'id_usuario'),
             ('dispositivos_fcm', 'id_usuario'),
             ('notificacoes', 'id_usuario'),
             ('disponibilidades', 'id_usuario'),
@@ -304,8 +307,10 @@ class Usuarios:
                 "documento": documento_limpo,
                 "tipo_documento": tipo_documento,
                 **cadastur,
-                "contato_emergencia_nome": dados.get("contato_emergencia_nome"),
-                "contato_emergencia_telefone": dados.get("contato_emergencia_telefone"),
+                "contato_emergencia_nome": "",
+                "contato_emergencia_telefone": "",
+                "contato_emergencia_relacao": "",
+                "contato_emergencia_consentimento": False,
                 "aceite_legal": aceite,
                 "historico_aceites_legais": [aceite],
                 "verificado": False,
@@ -339,7 +344,7 @@ class Usuarios:
                 usuario = doc.to_dict()
                 usuario.pop("senha", None)  
                 usuarios.append(usuario)
-            return usuarios, 200
+            return Emergencia.remover_dados(usuarios), 200
         except Exception as e:
             return {"erro": f"Ocorreu um erro ao buscar usuários: {str(e)}"}, 500
         
@@ -430,6 +435,10 @@ class Usuarios:
                 return {"erro": "Usuário não encontrado"}, 404
             doc_id = docs[0].id
             atual = docs[0].to_dict() or {}
+            try:
+                Emergencia.preparar(dados, atual)
+            except ValueError as error:
+                return {'erro': str(error)}, 400
             erro_cadastur = Usuarios._atualizar_cadastur(dados, atual)
             if erro_cadastur:
                 return erro_cadastur
@@ -483,6 +492,10 @@ class Usuarios:
             if not usuarios_ref.exists:
                 return {"erro": "Usuário não encontrado"}, 404
             atual = usuarios_ref.to_dict() or {}
+            try:
+                Emergencia.preparar(dados, atual)
+            except ValueError as error:
+                return {'erro': str(error)}, 400
             erro_cadastur = Usuarios._atualizar_cadastur(dados, atual)
             if erro_cadastur:
                 return erro_cadastur
@@ -499,33 +512,6 @@ class Usuarios:
             return {"mensagem": "Usuário atualizado com sucesso!"}, 200
         except Exception as e:
             return {"erro": f"Ocorreu um erro ao atualizar usuário: {str(e)}"}, 500
-
-    @staticmethod
-    def verificar_usuario(db, id_usuario, verificado):
-        try:
-            doc_ref = db.collection('usuarios').document(id_usuario)
-            doc = doc_ref.get()
-            if not doc.exists:
-                return {"erro": "Usuário não encontrado"}, 404
-
-            tipo = (doc.to_dict().get('tipo') or '').strip().lower()
-            if tipo not in {"guia", "agencia"}:
-                return {"erro": "Só é possível verificar usuários do tipo guia ou agencia"}, 400
-
-            doc_ref.update({"verificado": bool(verificado)})
-
-            if verificado:
-                Notificacoes.notificar_usuario(
-                    db, id_usuario,
-                    "Perfil verificado!",
-                    "Parabéns! Seu perfil foi verificado pela equipe do RotaFácil.",
-                    dados={"tipo": "verificacao"}
-                )
-
-            acao = "verificado" if verificado else "teve a verificação removida"
-            return {"mensagem": f"Usuário {acao} com sucesso!"}, 200
-        except Exception as e:
-            return {"erro": f"Erro ao verificar usuário: {str(e)}"}, 500
 
     @staticmethod
     def mudar_tipo_usuario(db, id_usuario, novo_tipo, documento_novo=None, cadastur=None):
@@ -630,35 +616,8 @@ class Usuarios:
             return {"erro": f"Erro ao alterar tipo de usuário: {str(e)}"}, 500
 
     @staticmethod
-    def obter_contato_emergencia(db, id_usuario, usuario_solicitante):
+    def obter_contato_emergencia(db, id_usuario, usuario_solicitante, reserva_id=None):
         try:
-            usuario_doc = db.collection('usuarios').document(id_usuario).get()
-            if not usuario_doc.exists:
-                return {"erro": "Usuário não encontrado"}, 404
-            dados_usuario = usuario_doc.to_dict()
-
-            papel_solicitante = (usuario_solicitante.get('tipo') or '').strip().lower()
-            id_solicitante = usuario_solicitante.get('id')
-
-            # Admin passa direto. Guia/agência somente durante vínculo operacional ativo.
-            if papel_solicitante != 'admin':
-                agendamentos_ref = db.collection('agendamentos') \
-                    .where('id_usuario', '==', id_usuario).stream()
-                from services.agendamentos import Agendamentos
-                tem_agendamento_ativo = any(
-                    str((doc.to_dict() or {}).get('status') or '').strip().lower()
-                    in {'agendado', 'pendente', 'confirmado', 'em_andamento'} and
-                    Agendamentos._usuario_pode_operar_agendamento(
-                        db, doc.to_dict() or {}, usuario_solicitante)
-                    for doc in agendamentos_ref)
-                if not tem_agendamento_ativo:
-                    return {"erro": "Você só pode ver o contato de emergência de participantes com agendamento ativo em seus roteiros."}, 403
-
-            return {
-                "nome_participante": dados_usuario.get("nome"),
-                "telefone_participante": dados_usuario.get("telefone"),
-                "contato_emergencia_nome": dados_usuario.get("contato_emergencia_nome"),
-                "contato_emergencia_telefone": dados_usuario.get("contato_emergencia_telefone"),
-            }, 200
-        except Exception as e:
-            return {"erro": f"Erro ao buscar contato de emergência: {str(e)}"}, 500
+            return Emergencia.consultar(db, id_usuario, usuario_solicitante, reserva_id)
+        except Exception:
+            return {'erro': 'Não foi possível consultar o contato de emergência.'}, 503

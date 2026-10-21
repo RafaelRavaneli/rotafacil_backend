@@ -133,8 +133,10 @@ def token_obrigatorio(f):
                 return jsonify({"erro": "Usuário não encontrado."}), 401
 
             usuario_atual = docs[0].to_dict()
+            if usuario_atual.get('ativo') is False:
+                return jsonify({'erro':'Esta conta está bloqueada. Entre em contato com o atendimento.', 'codigo':'CONTA_BLOQUEADA'}),403
             if dados_token.get('versao_auth', 0) != usuario_atual.get('versao_auth', 0):
-                return jsonify({'erro': 'Sua senha foi redefinida. Entre novamente.'}), 401
+                return jsonify({'erro': 'Sua sessão foi revogada. Entre novamente.'}), 401
             usuario_atual["id"] = docs[0].id
             usuario_atual.pop("senha", None)
         except jwt.ExpiredSignatureError:

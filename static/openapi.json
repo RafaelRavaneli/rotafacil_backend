@@ -464,7 +464,7 @@
         ],
         "summary": "Atualizar usuario por ID",
         "operationId": "put_api_usuarios_id",
-        "description": "Proprio usuario ou administrador. Envie ao menos um campo. Tipo e verificacao usam endpoints especificos. Este contrato lista campos de perfil; o servico atual ainda nao possui lista explicita de campos permitidos.",
+        "description": "Proprio usuario ou administrador. Envie ao menos um campo. Tipo e verificacao usam endpoints especificos. Este contrato lista campos de perfil; o servico atual ainda nao possui lista explicita de campos permitidos. Alterações genéricas são do próprio usuário. Admin não altera ou exclui contas de terceiros por esta rota; ações administrativas usam motivo e histórico. Admin não exclui ou troca o próprio papel por esta rota.",
         "parameters": [
           {
             "name": "id",
@@ -569,7 +569,7 @@
         ],
         "summary": "Excluir usuario por ID",
         "operationId": "delete_api_usuarios_id",
-        "description": "Proprio usuario ou administrador. Exclusao do documento; nao representa politica completa de exclusao de dados relacionados.",
+        "description": "Proprio usuario ou administrador. Exclusao do documento; nao representa politica completa de exclusao de dados relacionados. Alterações genéricas são do próprio usuário. Admin não altera ou exclui contas de terceiros por esta rota; ações administrativas usam motivo e histórico. Admin não exclui ou troca o próprio papel por esta rota.",
         "parameters": [
           {
             "name": "id",
@@ -717,7 +717,7 @@
         ],
         "summary": "Atualizar usuario por e-mail",
         "operationId": "put_api_usuarios_email_email",
-        "description": "Proprio usuario ou administrador. Envie ao menos um campo. Tipo e verificacao usam endpoints especificos. Este contrato lista campos de perfil; o servico atual ainda nao possui lista explicita de campos permitidos.",
+        "description": "Proprio usuario ou administrador. Envie ao menos um campo. Tipo e verificacao usam endpoints especificos. Este contrato lista campos de perfil; o servico atual ainda nao possui lista explicita de campos permitidos. Alterações genéricas são do próprio usuário. Admin não altera ou exclui contas de terceiros por esta rota; ações administrativas usam motivo e histórico. Admin não exclui ou troca o próprio papel por esta rota.",
         "parameters": [
           {
             "name": "email",
@@ -823,7 +823,7 @@
         ],
         "summary": "Excluir usuario por e-mail",
         "operationId": "delete_api_usuarios_email_email",
-        "description": "Proprio usuario ou administrador. Exclusao do documento; nao representa politica completa de exclusao de dados relacionados.",
+        "description": "Proprio usuario ou administrador. Exclusao do documento; nao representa politica completa de exclusao de dados relacionados. Alterações genéricas são do próprio usuário. Admin não altera ou exclui contas de terceiros por esta rota; ações administrativas usam motivo e histórico. Admin não exclui ou troca o próprio papel por esta rota.",
         "parameters": [
           {
             "name": "email",
@@ -897,7 +897,7 @@
         ],
         "summary": "Verificar guia ou agencia",
         "operationId": "put_api_usuarios_id_verificar",
-        "description": "Exclusivo de administrador. Valor padrao de verificado e true.",
+        "description": "Compatibilidade: exige verificado booleano e motivo, delega à operação administrativa auditada. Sem motivo a requisição é rejeitada.",
         "parameters": [
           {
             "name": "id",
@@ -972,11 +972,25 @@
           }
         },
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Verificacao"
+                "type": "object",
+                "required": [
+                  "verificado",
+                  "motivo"
+                ],
+                "properties": {
+                  "verificado": {
+                    "type": "boolean"
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                }
               }
             }
           }
@@ -990,7 +1004,7 @@
         ],
         "summary": "Alterar tipo de usuario",
         "operationId": "put_api_usuarios_id_tipo",
-        "description": "Proprio usuario ou administrador. Documento valido exigido para guia/agencia. Verificacao e reiniciada.",
+        "description": "Proprio usuario ou administrador. Documento valido exigido para guia/agencia. Verificacao e reiniciada. Alterações genéricas são do próprio usuário. Admin não altera ou exclui contas de terceiros por esta rota; ações administrativas usam motivo e histórico. Admin não exclui ou troca o próprio papel por esta rota.",
         "parameters": [
           {
             "name": "id",
@@ -1091,9 +1105,9 @@
         "tags": [
           "Usuarios"
         ],
-        "summary": "Consultar contato de emergencia",
+        "summary": "Consulta auditada do contato de emergência por reserva",
         "operationId": "get_api_usuarios_id_contato_emergencia",
-        "description": "Guia/agencia com reserva nao cancelada sob sua responsabilidade, ou administrador. O servico atual tambem considera reservas concluidas.",
+        "description": "Somente guia/agência responsável operacional. Reserva confirmada, agendada ou em andamento, desde 24 horas antes do início até o término. Exige consentimento atual. Cancelamento, conclusão, troca de responsável ou retirada do consentimento bloqueiam nova consulta. Admin não tem acesso irrestrito. Resposta não deve ser armazenada em cache.",
         "parameters": [
           {
             "name": "id",
@@ -1102,6 +1116,14 @@
             "schema": {
               "type": "string",
               "example": "ID_REAL_DO_REGISTRO"
+            }
+          },
+          {
+            "name": "id_agendamento",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1127,14 +1149,7 @@
             }
           },
           "403": {
-            "description": "Permissao insuficiente.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
+            "description": "Sem vínculo operacional, consentimento, situação ou período autorizados"
           },
           "404": {
             "description": "Registro nao encontrado.",
@@ -1155,6 +1170,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Auditoria ou consulta indisponível; nenhum dado é devolvido"
           }
         }
       }
@@ -1295,7 +1313,7 @@
         ],
         "summary": "Buscar trilhas com filtros",
         "operationId": "get_api_trilhas_busca",
-        "description": "Somente trilhas ativas. Busca geografica exige latitude, longitude e raio_km juntos. Resultado vazio retorna 404 com mensagem; busca geografica ordena por distancia.",
+        "description": "Busca com filtros combinados e cobertura geohash completa, distância Haversine em quilômetros e ordenação por distância/ID. Latitude, longitude e raio devem ser enviados juntos. Sem pagina mantém lista legada (404 se vazia). Com pagina responde envelope inclusive vazio. Paginação ocorre depois do refinamento do raio; mudanças no catálogo exigem reiniciar na página 1.",
         "parameters": [
           {
             "name": "cidade",
@@ -1354,7 +1372,9 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "number"
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
             }
           },
           {
@@ -1362,7 +1382,9 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "number"
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
             }
           },
           {
@@ -1370,23 +1392,52 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "number"
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "recursos_acessibilidade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Recursos separados por vírgulas; todos devem ser verdadeiros. Aceita mobilidade_reduzida, apoio_visual, apoio_auditivo, trechos_acessiveis, banheiro_acessivel e transporte_acessivel."
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "modalidade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Operacao realizada.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Trilha"
-                  }
-                }
-              }
-            }
+            "description": "Lista legada ou {itens: roteiro[], total: integer, pagina: integer, proxima_pagina: integer|null}. Roteiro geográfico inclui distancia_usuario_km numérica, sem arredondamento antes da ordenação."
           },
           "400": {
             "description": "Dados invalidos ou obrigatorios ausentes.",
@@ -1584,7 +1635,7 @@
         ],
         "summary": "Atualizar trilha",
         "operationId": "put_api_trilhas_id_trilha",
-        "description": "Criador, responsavel ou administrador. Envie ao menos um campo. Mudanca de guia exige permissao de atribuicao.",
+        "description": "Criador, responsavel ou administrador. Envie ao menos um campo. Mudanca de guia exige permissao de atribuicao. Admin utiliza suspensão/liberação auditada em /api/admin/roteiros/{id}/acao, sem editar ou excluir conteúdo por esta rota.",
         "parameters": [
           {
             "name": "id_trilha",
@@ -1679,7 +1730,7 @@
         ],
         "summary": "Desativar trilha",
         "operationId": "delete_api_trilhas_id_trilha",
-        "description": "Criador, responsavel ou administrador. Define ativo=false e preserva reservas existentes.",
+        "description": "Criador, responsavel ou administrador. Define ativo=false e preserva reservas existentes. Admin utiliza suspensão/liberação auditada em /api/admin/roteiros/{id}/acao, sem editar ou excluir conteúdo por esta rota.",
         "parameters": [
           {
             "name": "id_trilha",
@@ -3020,7 +3071,7 @@
         ],
         "summary": "Remover dispositivo FCM",
         "operationId": "delete_api_usuarios_fcm_token",
-        "description": "Recebe dispositivo_id na query, nao no JSON. Remove apenas dispositivos da conta autenticada.",
+        "description": "Recebe dispositivo_id na query, nao no JSON. Remove apenas dispositivos da conta autenticada. Alterações genéricas são do próprio usuário. Admin não altera ou exclui contas de terceiros por esta rota; ações administrativas usam motivo e histórico. Admin não exclui ou troca o próprio papel por esta rota.",
         "parameters": [
           {
             "name": "dispositivo_id",
@@ -3366,6 +3417,881 @@
           }
         }
       }
+    },
+    "/api/agendamentos/{id_agendamento}/checklist": {
+      "get": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Consultar próprio checklist da reserva",
+        "operationId": "get_checklist_pessoal",
+        "description": "Somente o turista dono da reserva. Guias, agências e administradores não acessam as marcações pessoais.",
+        "parameters": [
+          {
+            "name": "id_agendamento",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Checklist atual da reserva.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChecklistPessoal"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Checklist pertencente a outro usuário ou perfil não autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reserva ou roteiro inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Serviço indisponível; o cliente não deve confirmar o salvamento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Agendamentos"
+        ],
+        "summary": "Marcar um item do próprio checklist",
+        "operationId": "patch_checklist_pessoal",
+        "parameters": [
+          {
+            "name": "id_agendamento",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Altera apenas um item atual, preservando as demais marcações. Não modifica o roteiro. Reservas encerradas são somente leitura.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id_item",
+                  "marcado"
+                ],
+                "properties": {
+                  "id_item": {
+                    "type": "string",
+                    "minLength": 64,
+                    "maxLength": 64
+                  },
+                  "marcado": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checklist atual da reserva.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChecklistPessoal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Item ou marcação inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Checklist pertencente a outro usuário ou perfil não autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reserva ou roteiro inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Reserva disponível apenas para consulta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Serviço indisponível; o cliente não deve confirmar o salvamento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/avaliacoes/{id}": {
+      "patch": {
+        "summary": "Editar avaliação própria por até 7 dias após criação, sem renovar o prazo",
+        "tags": [
+          "Avaliações"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Registro existente, prazo encerrado ou conflito"
+          },
+          "503": {
+            "description": "Operação indisponível"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "nota",
+                  "comentario"
+                ],
+                "properties": {
+                  "nota": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "nota_guia": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "nota_agencia": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "comentario": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/avaliacoes/reserva/{id}": {
+      "get": {
+        "summary": "Consultar avaliação própria e permissão de edição",
+        "tags": [
+          "Avaliações"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Registro existente, prazo encerrado ou conflito"
+          },
+          "503": {
+            "description": "Operação indisponível"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/avaliacoes/profissional/{id}": {
+      "get": {
+        "summary": "Avaliações publicadas do guia ou agência",
+        "tags": [
+          "Avaliações"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Registro existente, prazo encerrado ou conflito"
+          },
+          "503": {
+            "description": "Operação indisponível"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/avaliacoes/profissional/{id}/perfil": {
+      "get": {
+        "summary": "Perfil profissional com campos públicos e médias reais",
+        "tags": [
+          "Avaliações"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Registro existente, prazo encerrado ou conflito"
+          },
+          "503": {
+            "description": "Operação indisponível"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/avaliacoes/{id}/denunciar": {
+      "post": {
+        "summary": "Denunciar avaliação publicada, uma denúncia por pessoa",
+        "tags": [
+          "Avaliações"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Registro existente, prazo encerrado ou conflito"
+          },
+          "503": {
+            "description": "Operação indisponível"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "motivo"
+                ],
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "enum": [
+                      "conteudo_ofensivo",
+                      "dados_pessoais",
+                      "spam",
+                      "outro"
+                    ]
+                  },
+                  "descricao": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/avaliacoes/moderacao": {
+      "get": {
+        "summary": "Painel de avaliações, denúncias e histórico",
+        "tags": [
+          "Avaliações"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Registro existente, prazo encerrado ou conflito"
+          },
+          "503": {
+            "description": "Operação indisponível"
+          }
+        },
+        "description": "Exclusivo admin validado pelo servidor.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "denunciadas",
+                "todas",
+                "publicadas",
+                "ocultas"
+              ],
+              "default": "denunciadas"
+            }
+          }
+        ]
+      }
+    },
+    "/api/avaliacoes/{id}/moderar": {
+      "post": {
+        "summary": "Ocultar, restaurar ou manter avaliação com motivo e histórico",
+        "tags": [
+          "Avaliações"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Registro existente, prazo encerrado ou conflito"
+          },
+          "503": {
+            "description": "Operação indisponível"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "acao",
+                  "motivo"
+                ],
+                "properties": {
+                  "acao": {
+                    "type": "string",
+                    "enum": [
+                      "ocultar",
+                      "restaurar",
+                      "manter"
+                    ]
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Exclusivo admin validado pelo servidor.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/contas": {
+      "get": {
+        "summary": "Consultar contas com dados mínimos",
+        "description": "Exclusivo admin ativo, conferido no servidor. Resposta não armazenável em cache.",
+        "tags": [
+          "Administração"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sessão ausente ou revogada"
+          },
+          "403": {
+            "description": "Sem permissão ou conta bloqueada"
+          },
+          "409": {
+            "description": "Estado já aplicado ou conflito concorrente"
+          },
+          "503": {
+            "description": "Auditoria ou operação indisponível; recarregar antes de repetir"
+          }
+        },
+        "parameters": [
+          {
+            "name": "estado",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/contas/{id}/acao": {
+      "post": {
+        "summary": "Aplicar ação auditada em contas",
+        "description": "Exclusivo admin ativo, conferido no servidor. Resposta não armazenável em cache.",
+        "tags": [
+          "Administração"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sessão ausente ou revogada"
+          },
+          "403": {
+            "description": "Sem permissão ou conta bloqueada"
+          },
+          "409": {
+            "description": "Estado já aplicado ou conflito concorrente"
+          },
+          "503": {
+            "description": "Auditoria ou operação indisponível; recarregar antes de repetir"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "acao",
+                  "motivo"
+                ],
+                "properties": {
+                  "acao": {
+                    "type": "string",
+                    "enum": [
+                      "bloquear",
+                      "desbloquear",
+                      "verificar",
+                      "remover_verificacao"
+                    ]
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/roteiros": {
+      "get": {
+        "summary": "Consultar roteiros e estados de moderação",
+        "description": "Exclusivo admin ativo, conferido no servidor. Resposta não armazenável em cache.",
+        "tags": [
+          "Administração"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sessão ausente ou revogada"
+          },
+          "403": {
+            "description": "Sem permissão ou conta bloqueada"
+          },
+          "409": {
+            "description": "Estado já aplicado ou conflito concorrente"
+          },
+          "503": {
+            "description": "Auditoria ou operação indisponível; recarregar antes de repetir"
+          }
+        },
+        "parameters": [
+          {
+            "name": "estado",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/roteiros/{id}/acao": {
+      "post": {
+        "summary": "Aplicar ação auditada em roteiros",
+        "description": "Exclusivo admin ativo, conferido no servidor. Resposta não armazenável em cache.",
+        "tags": [
+          "Administração"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sessão ausente ou revogada"
+          },
+          "403": {
+            "description": "Sem permissão ou conta bloqueada"
+          },
+          "409": {
+            "description": "Estado já aplicado ou conflito concorrente"
+          },
+          "503": {
+            "description": "Auditoria ou operação indisponível; recarregar antes de repetir"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "acao",
+                  "motivo"
+                ],
+                "properties": {
+                  "acao": {
+                    "type": "string",
+                    "enum": [
+                      "suspender",
+                      "liberar"
+                    ]
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/historico": {
+      "get": {
+        "summary": "Histórico administrativo de contas, roteiros, documentos e avaliações",
+        "description": "Exclusivo admin ativo, conferido no servidor. Resposta não armazenável em cache.",
+        "tags": [
+          "Administração"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sessão ausente ou revogada"
+          },
+          "403": {
+            "description": "Sem permissão ou conta bloqueada"
+          },
+          "409": {
+            "description": "Estado já aplicado ou conflito concorrente"
+          },
+          "503": {
+            "description": "Auditoria ou operação indisponível; recarregar antes de repetir"
+          }
+        },
+        "parameters": [
+          {
+            "name": "tipo",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id_alvo",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3539,12 +4465,6 @@
           "estado": {
             "type": "string"
           },
-          "contato_emergencia_nome": {
-            "type": "string"
-          },
-          "contato_emergencia_telefone": {
-            "type": "string"
-          },
           "cadastur_numero": {
             "type": "string",
             "description": "Número Cadastur obrigatório para cadastro ou mudança para guia/agência. Não implica validação oficial.",
@@ -3614,10 +4534,21 @@
             "nullable": true
           },
           "contato_emergencia_nome": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 120
           },
           "contato_emergencia_telefone": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 30
+          },
+          "contato_emergencia_relacao": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "contato_emergencia_consentimento": {
+            "type": "boolean",
+            "default": false,
+            "description": "Autorização explícita e revogável, somente pelo dono do perfil. Sem autorização implícita para dados legados."
           }
         }
       },
@@ -3660,11 +4591,13 @@
           },
           "contato_emergencia_nome": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 120
           },
           "contato_emergencia_telefone": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 30
           },
           "foto_url": {
             "type": "string",
@@ -3689,8 +4622,18 @@
             "type": "string",
             "description": "Validade opcional no formato AAAA-MM-DD.",
             "example": "2029-12-31"
+          },
+          "contato_emergencia_relacao": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "contato_emergencia_consentimento": {
+            "type": "boolean",
+            "default": false,
+            "description": "Autorização explícita e revogável, somente pelo dono do perfil. Sem autorização implícita para dados legados."
           }
-        }
+        },
+        "description": "Contato de emergência presente somente no próprio perfil; removido de listas e de consultas administrativas de outras pessoas."
       },
       "Verificacao": {
         "type": "object",
@@ -3738,19 +4681,22 @@
             "type": "string",
             "nullable": true
           },
-          "telefone_participante": {
-            "type": "string",
-            "nullable": true
-          },
           "contato_emergencia_nome": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 120
           },
           "contato_emergencia_telefone": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 30
+          },
+          "contato_emergencia_relacao": {
+            "type": "string",
+            "maxLength": 80
           }
-        }
+        },
+        "description": "Resposta somente mediante vínculo operacional atual, reserva/situação/período autorizados, consentimento e auditoria gravada."
       },
       "Ponto": {
         "type": "object",
@@ -3861,9 +4807,13 @@
           },
           "itens_recomendados": {
             "type": "array",
+            "maxItems": 50,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "default": []
           },
           "trajeto": {
             "type": "array",
@@ -3887,6 +4837,28 @@
             "type": "integer",
             "minimum": 1,
             "example": 12
+          },
+          "itens_obrigatorios": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "default": []
+          },
+          "acessibilidade": {
+            "$ref": "#/components/schemas/AcessibilidadeRoteiro"
+          },
+          "emergencia_organizador_telefone": {
+            "type": "string",
+            "maxLength": 30,
+            "description": "Telefone do responsável operacional, público no roteiro."
+          },
+          "emergencia_instrucoes": {
+            "type": "string",
+            "maxLength": 1500
           }
         }
       },
@@ -4335,9 +5307,13 @@
           },
           "itens_recomendados": {
             "type": "array",
+            "maxItems": 50,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "default": []
           },
           "trajeto": {
             "type": "array",
@@ -4356,6 +5332,28 @@
           "preco": {
             "type": "number",
             "example": 50
+          },
+          "itens_obrigatorios": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "default": []
+          },
+          "acessibilidade": {
+            "$ref": "#/components/schemas/AcessibilidadeRoteiro"
+          },
+          "emergencia_organizador_telefone": {
+            "type": "string",
+            "maxLength": 30,
+            "description": "Telefone do responsável operacional, público no roteiro."
+          },
+          "emergencia_instrucoes": {
+            "type": "string",
+            "maxLength": 1500
           }
         },
         "required": [
@@ -4444,9 +5442,13 @@
           },
           "itens_recomendados": {
             "type": "array",
+            "maxItems": 50,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "default": []
           },
           "trajeto": {
             "type": "array",
@@ -4492,6 +5494,28 @@
           },
           "distancia_usuario_km": {
             "type": "number"
+          },
+          "itens_obrigatorios": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "default": []
+          },
+          "acessibilidade": {
+            "$ref": "#/components/schemas/AcessibilidadeRoteiro"
+          },
+          "emergencia_organizador_telefone": {
+            "type": "string",
+            "maxLength": 30,
+            "description": "Telefone do responsável operacional, público no roteiro."
+          },
+          "emergencia_instrucoes": {
+            "type": "string",
+            "maxLength": 1500
           }
         }
       },
@@ -4526,6 +5550,145 @@
           }
         },
         "description": "Aceite expresso dos termos e ciência da política. Não representa consentimento para permissões opcionais."
+      },
+      "ChecklistPessoal": {
+        "type": "object",
+        "required": [
+          "id_agendamento",
+          "itens",
+          "editavel",
+          "total",
+          "preparados"
+        ],
+        "properties": {
+          "id_agendamento": {
+            "type": "string"
+          },
+          "editavel": {
+            "type": "boolean"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "preparados": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "itens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "nome",
+                "obrigatorio",
+                "marcado"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "nome": {
+                  "type": "string"
+                },
+                "obrigatorio": {
+                  "type": "boolean"
+                },
+                "marcado": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AcessibilidadeRoteiro": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Campos ausentes ou nulos significam não informado. Informações declaradas pelo organizador.",
+        "properties": {
+          "mobilidade_reduzida": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "apoio_visual": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "apoio_auditivo": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "acompanhante_necessario": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "trechos_acessiveis": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "banheiro_acessivel": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "transporte_acessivel": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "restricoes_fisicas": {
+            "type": "string",
+            "maxLength": 1500
+          },
+          "condicionamento": {
+            "type": "string",
+            "maxLength": 1500
+          },
+          "adaptacoes": {
+            "type": "string",
+            "maxLength": 1500
+          },
+          "observacoes": {
+            "type": "string",
+            "maxLength": 1500
+          },
+          "idade_minima": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 120
+          }
+        }
+      },
+      "AvaliacaoPublica": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nome_usuario": {
+            "type": "string"
+          },
+          "nota_roteiro": {
+            "type": "integer"
+          },
+          "nota_guia": {
+            "type": "integer"
+          },
+          "nota_agencia": {
+            "type": "integer"
+          },
+          "comentario": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "editado_em": {
+            "type": "string"
+          }
+        },
+        "description": "Somente dados públicos. Identidade do denunciante e dados de moderação são administrativos."
       }
     }
   }

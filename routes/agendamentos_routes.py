@@ -4,9 +4,30 @@ from flask import Blueprint, request, jsonify
 from models.database import bd
 from services.agendamentos import Agendamentos
 from services.autenticacao import token_obrigatorio, requer_papel, eh_dono_ou_tem_papel
+from services.checklists import Checklists
 
-# Inicializa o Blueprint
 agendamentos_bp = Blueprint('agendamentos', __name__)
+
+@agendamentos_bp.route('/<id_agendamento>/checklist', methods=['GET'])
+@token_obrigatorio
+def obter_checklist(usuario_atual, id_agendamento):
+    try:
+        resposta, status = Checklists.obter(bd, id_agendamento, usuario_atual)
+    except Exception:
+        resposta, status = {'erro': 'Não foi possível carregar seu checklist. Tente novamente.'}, 503
+    return jsonify(resposta), status
+
+
+@agendamentos_bp.route('/<id_agendamento>/checklist', methods=['PATCH'])
+@token_obrigatorio
+def atualizar_checklist(usuario_atual, id_agendamento):
+    try:
+        resposta, status = Checklists.atualizar(
+            bd, id_agendamento, usuario_atual, request.get_json(silent=True))
+    except Exception:
+        resposta, status = {'erro': 'Não foi possível salvar seu checklist. Tente novamente.'}, 503
+    return jsonify(resposta), status
+
 
 
 def _checkin_checkout_ativo():
@@ -70,7 +91,7 @@ def cancelar_agendamento(usuario_atual, id_agendamento):
 
 @agendamentos_bp.route('/<id_agendamento>/responder', methods=['PUT'])
 @token_obrigatorio
-@requer_papel('guia', 'agencia', 'admin')
+@requer_papel('guia', 'agencia')
 def responder_agendamento(usuario_atual, id_agendamento):
     dados = request.get_json(silent=True) or {}
     resposta, status = Agendamentos.responder_agendamento(
@@ -79,7 +100,7 @@ def responder_agendamento(usuario_atual, id_agendamento):
 
 @agendamentos_bp.route('/finalizar-saida', methods=['PUT'])
 @token_obrigatorio
-@requer_papel('guia', 'agencia', 'admin')
+@requer_papel('guia', 'agencia')
 def finalizar_saida(usuario_atual):
     dados = request.get_json(silent=True) or {}
     resposta, status = Agendamentos.finalizar_saida(

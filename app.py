@@ -1,3 +1,4 @@
+from routes.admin_routes import admin_bp
 import os
 from flask import Flask, render_template
 from flask_cors import CORS
@@ -28,6 +29,7 @@ CORS(app, resources={r"/api/*": {"origins":
 # Registra o Blueprint de trilhas
 # O url_prefix='/api/trilhas' garante que a rota '/' lá no trilhas_routes.py 
 # vire automaticamente '/api/trilhas/' no navegador/Postman.
+app.register_blueprint(admin_bp, url_prefix='/api/admin')
 app.register_blueprint(community_bp, url_prefix='/api')
 app.register_blueprint(trilhas_bp, url_prefix='/api/trilhas')
 app.register_blueprint(usuarios_bp, url_prefix='/api/usuarios')

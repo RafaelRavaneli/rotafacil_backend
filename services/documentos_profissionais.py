@@ -145,6 +145,8 @@ class DocumentosProfissionais:
                 return {'erro': 'Acesso negado.'}, 403
             status = str((dados_analise or {}).get('status') or '').strip().lower()
             observacao = str((dados_analise or {}).get('observacao') or '').strip()
+            if len(observacao)>500:
+                return {'erro':'Observação deve ter até 500 caracteres.'},400
             if status not in {'aprovado', 'rejeitado'}:
                 return {'erro': 'Use status aprovado ou rejeitado.'}, 400
             if status == 'rejeitado' and not observacao:
@@ -154,6 +156,8 @@ class DocumentosProfissionais:
             if not doc.exists:
                 return {'erro': 'Documento não encontrado.'}, 404
             dados_doc = doc.to_dict() or {}
+            from services.administracao import Administracao
+            audit=Administracao.registrar(db,usuario,'documento',identificador,'analisar_'+status,observacao or 'Documento profissional aprovado.',{'status':dados_doc.get('status')},{'status':status})
             agora = datetime.datetime.now(datetime.timezone.utc).isoformat()
             ref.update({
                 'status': status,
@@ -171,8 +175,10 @@ class DocumentosProfissionais:
                             outro.to_dict() or {}).get('status') == 'aprovado':
                         existe_aprovado = True
                         break
-            db.collection('usuarios').document(id_usuario).update(
-                {'verificado': existe_aprovado})
+            usuario_ref=db.collection('usuarios').document(id_usuario)
+            dados_usuario=usuario_ref.get().to_dict() or {}
+            usuario_ref.update({'verificado': existe_aprovado and not dados_usuario.get('verificacao_suspensa_admin',False) and dados_usuario.get('ativo') is not False})
+            audit.update({'resultado':'aplicada'})
             return {'mensagem': f'Documento {status} com sucesso.'}, 200
         except Exception as error:
             return {'erro': f'Erro ao analisar documento profissional: {error}'}, 500

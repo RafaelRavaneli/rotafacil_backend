@@ -139,7 +139,9 @@ class CommunityTests(unittest.TestCase):
             self.assertEqual(self.db.collection('convites_guias').document(invite['id']).get().to_dict()['status'], 'pendente')
 
     def test_media_real_do_guia_e_publica_sem_expor_dados_privados(self):
-        self.db.collection('usuarios').document('g').update({'nota_media': 4.5, 'total_avaliacoes': 2})
+        self.db.collection('usuarios').document('g').update({'nota_media': 5, 'total_avaliacoes': 99})
+        self.db.collection('avaliacoes').document('r1').set({'id_guia':'g','nota_guia':4})
+        self.db.collection('avaliacoes').document('r2').set({'id_guia':'g','nota_guia':5})
         public = Community.guide(self.db, 'g')
         self.assertEqual(public['nota_media'], 4.5)
         self.assertEqual(public['total_avaliacoes'], 2)
@@ -720,22 +722,25 @@ class CommunityTests(unittest.TestCase):
             self.db,'b2',self.a)[1],403)
 
     def test_emergencia_exige_reserva_ativa_e_responsabilidade(self):
+        from datetime import datetime, timedelta, timezone
+        agora = datetime.now(timezone.utc)
         self.db.collection('usuarios').document('t').update({
-            'telefone':'1111','contato_emergencia_nome':'Maria',
-            'contato_emergencia_telefone':'2222'})
+            'contato_emergencia_nome':'Maria', 'contato_emergencia_telefone':'44999990000',
+            'contato_emergencia_relacao':'Mãe', 'contato_emergencia_consentimento': True})
         self.db.collection('trilhas').document('t1').set(
             {'criado_por':'a@example.test','id_guia':'g'})
         self.db.collection('agendamentos').document('b1').set({
-            'id_usuario':'t','id_trilha':'t1','id_guia':'g','status':'concluido'})
-        self.assertEqual(Usuarios.obter_contato_emergencia(self.db,'t',self.g)[1],403)
+            'id_usuario':'t','id_trilha':'t1','id_guia':'g','status':'concluido',
+            'data_hora_inicio': (agora-timedelta(hours=1)).isoformat(),
+            'data_hora_fim': (agora+timedelta(hours=1)).isoformat()})
+        self.assertEqual(Usuarios.obter_contato_emergencia(self.db,'t',self.a,'b1')[1],403)
         self.db.collection('agendamentos').document('b1').update({'status':'em_andamento'})
-        self.assertEqual(Usuarios.obter_contato_emergencia(self.db,'t',self.g)[1],403)
-        for solicitante in (self.a,):
-            result,status=Usuarios.obter_contato_emergencia(self.db,'t',solicitante)
-            self.assertEqual(status,200,result)
-            self.assertEqual(result['contato_emergencia_nome'],'Maria')
+        self.assertEqual(Usuarios.obter_contato_emergencia(self.db,'t',self.g,'b1')[1],403)
+        result,status=Usuarios.obter_contato_emergencia(self.db,'t',self.a,'b1')
+        self.assertEqual(status,200,result)
+        self.assertEqual(result['contato_emergencia_nome'],'Maria')
         self.assertEqual(Usuarios.obter_contato_emergencia(self.db,'t',
-            {**self.a,'id':'outra','email':'outra@example.test'})[1],403)
+            {**self.a,'id':'outra','email':'outra@example.test'},'b1')[1],403)
 
     def test_atualizacao_de_usuario_rejeita_campos_protegidos(self):
         result,status=Usuarios.atualizar_usuario_por_id(
@@ -903,7 +908,7 @@ class CommunityTests(unittest.TestCase):
             self.db,'t','t1',5,'  Ótima  ','t')
         self.assertEqual(status,201,result)
         avaliacao=self.db.collection('avaliacoes').document(
-            't__t1').get().to_dict()
+            'b1').get().to_dict()
         self.assertEqual(avaliacao['comentario'],'Ótima')
         self.assertEqual(Avaliacoes.adicionar_avaliacao(
             self.db,'t','t1',4,'Outra','t')[1],409)
