@@ -5,3 +5,4 @@ firebase-key.json
 *__pycache__
 .vercel/
 public/static/openapi.json
+.demo_local/
