@@ -1,4 +1,5 @@
 import requests
+from services.erros import erro_interno
 
 
 class Clima:
@@ -65,6 +66,6 @@ class Clima:
             }, 200
 
         except requests.exceptions.RequestException as e:
-            return {"erro": f"Erro ao consultar serviço de previsão do tempo: {str(e)}"}, 502
+            return erro_interno("Erro ao consultar serviço de previsão do tempo", 502)
         except Exception as e:
-            return {"erro": f"Erro interno: {str(e)}"}, 500
+            return erro_interno("Erro interno")

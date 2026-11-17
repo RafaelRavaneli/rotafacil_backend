@@ -3,6 +3,7 @@ from datetime import date
 from firebase_admin import firestore
 from services.notificacoes import Notificacoes
 from services.trilhas import Trilhas
+from services.erros import erro_interno
 
 class Agendamentos:
     STATUS_ATIVOS = {'agendado', 'pendente', 'confirmado', 'em_andamento'}
@@ -199,7 +200,7 @@ class Agendamentos:
 
             return {"mensagem": "Agendamento realizado com sucesso!", "id": id_agendamento}, 201
         except Exception as e:
-            return {"erro": f"Erro interno: {str(e)}"}, 500
+            return erro_interno("Erro interno")
 
     @staticmethod
     def listar_agendamentos_usuario(db, id_usuario):
@@ -209,7 +210,7 @@ class Agendamentos:
             lista = [Agendamentos._serializar(db, doc.to_dict(), usuarios, trilhas) for doc in ref]
             return Agendamentos._ordenar_para_exibicao(lista), 200
         except Exception as e:
-            return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
+            return erro_interno("Erro ao buscar agendamentos")
 
     @staticmethod
     def _identificadores_guia(db, id_guia):
@@ -240,7 +241,7 @@ class Agendamentos:
             lista = [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()]
             return Agendamentos._ordenar_para_exibicao(lista), 200
         except Exception as e:
-            return {"erro": f"Erro ao buscar agendamentos: {str(e)}"}, 500
+            return erro_interno("Erro ao buscar agendamentos")
 
     @staticmethod
     def listar_agendamentos_agencia(db, usuario_atual):
@@ -265,7 +266,7 @@ class Agendamentos:
             lista = [Agendamentos._serializar(db, row, usuarios, trilhas) for row in rows.values()]
             return Agendamentos._ordenar_para_exibicao(lista), 200
         except Exception as e:
-            return {"erro": f"Erro ao buscar agendamentos da agência: {str(e)}"}, 500
+            return erro_interno("Erro ao buscar agendamentos da agência")
 
     @staticmethod
     def cancelar_agendamento(db, id_agendamento, usuario_atual):
@@ -318,7 +319,7 @@ class Agendamentos:
 
             return {"mensagem": "agendamento cancelado com sucesso !"}, 200
         except Exception as e:
-            return {"erro": f"Erro ao cancelar agendamento: {str(e)}"}, 500
+            return erro_interno("Erro ao cancelar agendamento")
 
     @staticmethod
     def responder_agendamento(db, id_agendamento, usuario_atual, resposta):
@@ -353,7 +354,7 @@ class Agendamentos:
                        'id_agendamento': id_agendamento})
             return {"mensagem": f"Agendamento {resposta} com sucesso."}, 200
         except Exception as e:
-            return {"erro": f"Erro ao responder agendamento: {str(e)}"}, 500
+            return erro_interno("Erro ao responder agendamento")
 
     @staticmethod
     def finalizar_saida(db, id_trilha, id_data, data_agendada, usuario_atual):
@@ -421,7 +422,7 @@ class Agendamentos:
             return {"mensagem": "Saída finalizada com sucesso.",
                     "reservas_finalizadas": len(reservas)}, 200
         except Exception as e:
-            return {"erro": f"Erro ao finalizar a saída: {str(e)}"}, 500
+            return erro_interno("Erro ao finalizar a saída")
 
     @staticmethod
     def fazer_checkin(db, id_agendamento, usuario_atual, latitude=None, longitude=None):
@@ -449,7 +450,7 @@ class Agendamentos:
             doc_ref.update(atualizacao)
             return {"mensagem": "Check-in realizado! Bom roteiro e cuidado no percurso."}, 200
         except Exception as e:
-            return {"erro": f"Erro ao fazer check-in: {str(e)}"}, 500
+            return erro_interno("Erro ao fazer check-in")
 
     @staticmethod
     def fazer_checkout(db, id_agendamento, usuario_atual):
@@ -472,7 +473,7 @@ class Agendamentos:
             })
             return {"mensagem": "Check-out realizado! Roteiro concluído com sucesso."}, 200
         except Exception as e:
-            return {"erro": f"Erro ao fazer check-out: {str(e)}"}, 500
+            return erro_interno("Erro ao fazer check-out")
     @staticmethod
     def dashboard_guia(db, id_guia):
         """Valores declarados nas reservas; não representam pagamentos conciliados."""

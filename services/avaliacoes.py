@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from google.api_core.exceptions import AlreadyExists
 from services.community import update_checked, CommunityError
+from services.erros import erro_interno
 
 
 class Avaliacoes:
@@ -190,7 +191,7 @@ class Avaliacoes:
         except AlreadyExists:
             return {"erro": "Esta reserva já foi avaliada."}, 409
         except Exception as e:
-            return {"erro": f"Erro ao registrar avaliação: {str(e)}"}, 500
+            return erro_interno("Erro ao registrar avaliação")
 
     @staticmethod
     def _publicada(dados):

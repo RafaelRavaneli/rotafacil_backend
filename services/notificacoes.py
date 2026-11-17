@@ -8,6 +8,7 @@ import logging
 from email.message import EmailMessage
 from dotenv import load_dotenv
 from services.community import PushDevices
+from services.erros import erro_interno
 
 load_dotenv()
 
@@ -53,7 +54,7 @@ class Notificacoes:
             itens.sort(key=lambda item: item.get('criado_em') or '', reverse=True)
             return itens[:100], 200
         except Exception as error:
-            return {'erro': f'Erro ao listar notificações: {error}'}, 500
+            return erro_interno("Erro ao listar notificações")
 
     @staticmethod
     def marcar_lida(db, usuario, identificador):
@@ -67,7 +68,7 @@ class Notificacoes:
             ref.update({'lida': True})
             return {'mensagem': 'Notificação marcada como lida.'}, 200
         except Exception as error:
-            return {'erro': f'Erro ao atualizar notificação: {error}'}, 500
+            return erro_interno("Erro ao atualizar notificação")
 
     @staticmethod
     def marcar_todas_lidas(db, usuario):
@@ -81,7 +82,7 @@ class Notificacoes:
             return {'mensagem': 'Notificações marcadas como lidas.',
                     'quantidade': quantidade}, 200
         except Exception as error:
-            return {'erro': f'Erro ao atualizar notificações: {error}'}, 500
+            return erro_interno("Erro ao atualizar notificações")
 
     @staticmethod
     def obter_preferencias(db, usuario):
@@ -104,7 +105,7 @@ class Notificacoes:
                 {'preferencias_notificacoes': atuais})
             return atuais, 200
         except Exception as error:
-            return {'erro': f'Erro ao salvar preferências: {error}'}, 500
+            return erro_interno("Erro ao salvar preferências")
 
     @staticmethod
     def _enviar_email(destinatario, assunto, mensagem):

@@ -6,6 +6,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from flask import request, jsonify
 from functools import wraps
 from firebase_admin import firestore
+from services.erros import erro_interno, logger
 
 load_dotenv()
 
@@ -74,7 +75,7 @@ class Autenticacao:
                 return {"erro": "Credenciais inválidas"}, 401
 
         except Exception as e:
-            return {"erro": f"Ocorreu um erro no login: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro no login")
 
     @staticmethod
     def alterar_senha(db, usuario_atual, dados):
@@ -101,7 +102,7 @@ class Autenticacao:
             doc_ref.update({'senha': generate_password_hash(nova_senha)})
             return {"mensagem": "Senha alterada com sucesso."}, 200
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao alterar a senha: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao alterar a senha")
 
 
 def token_obrigatorio(f):
@@ -143,8 +144,9 @@ def token_obrigatorio(f):
             return jsonify({"erro": "O token expirou. Faça login novamente."}), 401
         except jwt.InvalidTokenError:
             return jsonify({"erro": "Token inválido."}), 401
-        except Exception as e:
-            return jsonify({"erro": f"Erro ao validar token: {str(e)}"}), 401
+        except Exception:
+            logger.exception("Erro ao validar token")
+            return jsonify({"erro": "Não foi possível validar a sessão. Entre novamente."}), 401
 
         return f(usuario_atual, *args, **kwargs)
     return decorated
