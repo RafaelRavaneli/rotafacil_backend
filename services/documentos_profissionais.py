@@ -1,6 +1,7 @@
 import datetime
 import mimetypes
 import uuid
+from services.erros import erro_interno
 
 
 class DocumentosProfissionais:
@@ -67,7 +68,7 @@ class DocumentosProfissionais:
             return {key: value for key, value in dados.items()
                     if key != 'caminho_storage'}, 201
         except Exception as error:
-            return {'erro': f'Erro ao enviar documento profissional: {error}'}, 500
+            return erro_interno("Erro ao enviar documento profissional")
 
     @staticmethod
     def listar(db, usuario, status=None):
@@ -97,7 +98,7 @@ class DocumentosProfissionais:
             itens.sort(key=lambda item: item.get('criado_em') or '', reverse=True)
             return itens, 200
         except Exception as error:
-            return {'erro': f'Erro ao listar documentos profissionais: {error}'}, 500
+            return erro_interno("Erro ao listar documentos profissionais")
 
     @staticmethod
     def obter_arquivo(db, bucket, usuario, identificador):
@@ -117,7 +118,7 @@ class DocumentosProfissionais:
                 'nome_arquivo': dados.get('nome_arquivo') or 'documento',
             }, 200
         except Exception as error:
-            return {'erro': f'Erro ao abrir documento profissional: {error}'}, 500
+            return erro_interno("Erro ao abrir documento profissional")
 
     @staticmethod
     def excluir(db, bucket, usuario, identificador):
@@ -136,7 +137,7 @@ class DocumentosProfissionais:
             ref.delete()
             return {'mensagem': 'Documento excluído com sucesso.'}, 200
         except Exception as error:
-            return {'erro': f'Erro ao excluir documento profissional: {error}'}, 500
+            return erro_interno("Erro ao excluir documento profissional")
 
     @staticmethod
     def analisar(db, usuario, identificador, dados_analise):
@@ -181,4 +182,4 @@ class DocumentosProfissionais:
             audit.update({'resultado':'aplicada'})
             return {'mensagem': f'Documento {status} com sucesso.'}, 200
         except Exception as error:
-            return {'erro': f'Erro ao analisar documento profissional: {error}'}, 500
+            return erro_interno("Erro ao analisar documento profissional")
