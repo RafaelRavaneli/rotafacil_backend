@@ -1,4 +1,5 @@
 from firebase_admin import firestore
+from services.erros import erro_interno
 
 
 class Favoritos:
@@ -29,7 +30,7 @@ class Favoritos:
             })
             return {"mensagem": "Roteiro adicionado aos favoritos!"}, 201
         except Exception as e:
-            return {"erro": f"Erro ao adicionar favorito: {str(e)}"}, 500
+            return erro_interno("Erro ao adicionar favorito")
 
     @staticmethod
     def remover_favorito(db, id_usuario, id_trilha):
@@ -43,7 +44,7 @@ class Favoritos:
             doc_ref.delete()
             return {"mensagem": "Roteiro removido dos favoritos"}, 200
         except Exception as e:
-            return {"erro": f"Erro ao remover favorito: {str(e)}"}, 500
+            return erro_interno("Erro ao remover favorito")
 
     @staticmethod
     def listar_favoritos(db, id_usuario):
@@ -59,4 +60,4 @@ class Favoritos:
 
             return trilhas, 200
         except Exception as e:
-            return {"erro": f"Erro ao listar favoritos: {str(e)}"}, 500
+            return erro_interno("Erro ao listar favoritos")

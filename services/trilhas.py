@@ -8,6 +8,7 @@ from datetime import date, datetime
 import pygeohash as pgh
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
+from services.erros import erro_interno
 
 class Trilhas:
     @staticmethod
@@ -491,7 +492,7 @@ class Trilhas:
             db.collection('trilhas').document(id_trilha).set(trilha)
             return {"mensagem": "Roteiro cadastrado com sucesso!", "id": id_trilha}, 201
         except Exception as e:
-            return {"erro": f"Erro interno: {str(e)}"}, 500
+            return erro_interno("Erro interno")
         
     @staticmethod
     def listar_trilhas(db):
@@ -501,7 +502,7 @@ class Trilhas:
             trilhas = [Trilhas._serializar_trilha(db, doc, responsaveis) for doc in trilhas_ref]
             return trilhas, 200
         except Exception as e:
-            return {"erro": f"Erro ao buscar roteiros: {str(e)}"}, 500
+            return erro_interno("Erro ao buscar roteiros")
     
     @staticmethod
     def buscar_trilha_por_id(db, id_trilha):
@@ -511,7 +512,7 @@ class Trilhas:
                 return Trilhas._serializar_trilha(db, doc_ref), 200
             return {"erro": "Roteiro não encontrado"}, 404
         except Exception as e:
-            return {"erro": f"Erro ao buscar roteiro: {str(e)}"}, 500
+            return erro_interno("Erro ao buscar roteiro")
 
     @staticmethod
     def listar_trilhas_por_data(db, data_inicio, data_fim):
@@ -528,7 +529,7 @@ class Trilhas:
                 return trilhas, 200
             return {"mensagem": "Nenhum roteiro encontrado nesse período"}, 404
         except Exception as e:
-            return {"erro": f"Ocorreu um erro na busca por data: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro na busca por data")
         
     @staticmethod
     def atualizar_trilha(db, id_trilha, dados, usuario_atual):
@@ -609,7 +610,7 @@ class Trilhas:
             doc_ref.update(dados)
             return {"mensagem": "Roteiro atualizado com sucesso!"}, 200
         except Exception as e:
-            return {"erro": f"Erro ao atualizar roteiro: {str(e)}"}, 500
+            return erro_interno("Erro ao atualizar roteiro")
              
     #busca avançada com filtros dinâmicos  
     @staticmethod

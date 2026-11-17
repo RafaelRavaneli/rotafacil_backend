@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from services.uploads import Uploads
+from services.erros import erro_interno
 from services.autenticacao import token_obrigatorio, requer_papel
 
 # Inicializa o Blueprint
@@ -27,5 +28,6 @@ def upload_imagem(usuario_atual):
         
         return jsonify(resposta), status
         
-    except Exception as e:
-        return jsonify({"erro": f"Erro na rota de upload: {str(e)}"}), 500
+    except Exception:
+        corpo, status = erro_interno("Erro na rota de upload")
+        return jsonify(corpo), status

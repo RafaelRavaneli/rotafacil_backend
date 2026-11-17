@@ -1,9 +1,12 @@
 rules_version = '2';
 
+// O app nunca acessa o Firestore direto: todo acesso passa pela API, que usa
+// o Admin SDK (não sujeito a estas regras) e aplica as permissões de cada perfil.
+// Por isso nenhum cliente pode ler ou gravar documentos diretamente.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

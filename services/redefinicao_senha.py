@@ -8,6 +8,7 @@ from google.api_core.exceptions import FailedPrecondition
 from google.cloud.firestore_v1 import LastUpdateOption
 from werkzeug.security import generate_password_hash
 from services.notificacoes import Notificacoes
+from services.erros import erro_interno
 
 
 class RedefinicaoSenha:
@@ -97,7 +98,7 @@ class RedefinicaoSenha:
             return mensagem_generica, 200
 
         except Exception as e:
-            return {"erro": f"Erro interno: {str(e)}"}, 500
+            return erro_interno("Erro interno")
         
     @staticmethod
     def redefinir_senha(db, dados):
@@ -176,4 +177,4 @@ class RedefinicaoSenha:
             return {"mensagem": "Senha redefinida com sucesso!", **sessao}, 200
 
         except Exception as e:
-            return {"erro": f"Erro interno: {str(e)}"}, 500
+            return erro_interno("Erro interno")

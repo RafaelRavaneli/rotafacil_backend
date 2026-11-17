@@ -7,6 +7,7 @@ import uuid
 from werkzeug.security import generate_password_hash
 from firebase_admin import firestore, storage
 from services.cadastur import Cadastur
+from services.erros import erro_interno
 
 class Usuarios:
     @staticmethod
@@ -333,7 +334,7 @@ class Usuarios:
                     "confirmacao_email_necessaria": usuario['exigir_confirmacao_email'],
                     "confirmacao_email_enviada": enviada}, 201
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao salvar: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao salvar")
 
     @staticmethod
     def listar_usuarios(db):
@@ -346,7 +347,7 @@ class Usuarios:
                 usuarios.append(usuario)
             return Emergencia.remover_dados(usuarios), 200
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao buscar usuários: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao buscar usuários")
         
     @staticmethod
     def listar_usuario_por_email(db, email):
@@ -361,7 +362,7 @@ class Usuarios:
                 return usuarios, 200
             return {"erro": "Usuário não encontrado"}, 404
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao buscar usuário: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao buscar usuário")
     
     @staticmethod
     def listar_usuario_por_id(db, id):
@@ -373,7 +374,7 @@ class Usuarios:
                 return usuario, 200
             return {"erro": "Usuário não encontrado"}, 404
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao buscar usuário: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao buscar usuário")
 
     @staticmethod
     def deletar_usuario_por_email(db, email):
@@ -385,7 +386,7 @@ class Usuarios:
             
             return Usuarios._excluir_conta(db, docs[0])
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao deletar usuário: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao deletar usuário")
         
     @staticmethod
     def deletar_usuario_por_id(db, id):
@@ -395,7 +396,7 @@ class Usuarios:
                 return {"erro": "Usuário não encontrado"}, 404
             return Usuarios._excluir_conta(db, usuarios_ref)
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao deletar usuário: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao deletar usuário")
         
     @staticmethod
     def atualizar_usuario_por_email(db, email, dados):
@@ -454,7 +455,7 @@ class Usuarios:
             db.collection('usuarios').document(doc_id).update(dados)
             return {"mensagem": "Usuário atualizado com sucesso!"}, 200
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao atualizar usuário: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao atualizar usuário")
     
     @staticmethod
     def atualizar_usuario_por_id(db, id, dados):
@@ -511,7 +512,7 @@ class Usuarios:
             db.collection('usuarios').document(id).update(dados)
             return {"mensagem": "Usuário atualizado com sucesso!"}, 200
         except Exception as e:
-            return {"erro": f"Ocorreu um erro ao atualizar usuário: {str(e)}"}, 500
+            return erro_interno("Ocorreu um erro ao atualizar usuário")
 
     @staticmethod
     def mudar_tipo_usuario(db, id_usuario, novo_tipo, documento_novo=None, cadastur=None):
@@ -613,7 +614,7 @@ class Usuarios:
             doc_ref.update(atualizacao)
             return {"mensagem": f"Tipo de usuário alterado para '{novo_tipo}' com sucesso!"}, 200
         except Exception as e:
-            return {"erro": f"Erro ao alterar tipo de usuário: {str(e)}"}, 500
+            return erro_interno("Erro ao alterar tipo de usuário")
 
     @staticmethod
     def obter_contato_emergencia(db, id_usuario, usuario_solicitante, reserva_id=None):

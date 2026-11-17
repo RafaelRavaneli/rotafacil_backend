@@ -1,6 +1,7 @@
 import requests
 import os
 from dotenv import load_dotenv
+from services.erros import erro_interno
 
 # O override=True força o Python a ler as alterações mais recentes do seu arquivo .env
 load_dotenv()
@@ -55,4 +56,4 @@ class Uploads:
                 }, resposta.status_code
 
         except Exception as e:
-            return {"erro": f"Erro interno no serviço de upload: {str(e)}"}, 500
+            return erro_interno("Erro interno no serviço de upload")
