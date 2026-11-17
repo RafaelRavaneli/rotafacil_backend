@@ -214,7 +214,7 @@ ROTEIROS = [
         dificuldade='Avançado', modalidade='Trekking', atividades=['Trekking', 'Acampamento'],
         distancia_km=18.0, latitude=-25.2140, longitude=-48.8320, preco=420.0, capacidade=10,
         ponto_encontro='Fazenda Pico Paraná, na BR-116',
-        imagem_url=unsplash('1506905925346-21bda4d32df4'),
+        imagem_url=ibb('ccrdp42T'),
         acessibilidade={'idade_minima': 16, 'condicionamento': 'Bom preparo físico; subidas íngremes.'},
         itens_obrigatorios=['Mochila cargueira', 'Saco de dormir', 'Lanterna de cabeça', 'Água (mínimo 3 L)',
                             'Agasalho impermeável'],
@@ -228,7 +228,7 @@ ROTEIROS = [
         dificuldade='Intermediário', modalidade='Trilha', atividades=['Trilha', 'Escalada'],
         distancia_km=5.0, latitude=-25.3870, longitude=-49.0030, preco=110.0, capacidade=12,
         ponto_encontro='Estacionamento do Parque Estadual da Serra da Baitaca',
-        imagem_url=ibb('ccrdp42T'),
+        imagem_url=ibb('TMzTj03t'),
         acessibilidade={'idade_minima': 12},
         datas=[saida('2026-11-21', '04:30', '09:30'), saida('2026-12-05', '04:30', '09:30')])),
     ('itupava', 'araucaria', 'lucas', dict(
